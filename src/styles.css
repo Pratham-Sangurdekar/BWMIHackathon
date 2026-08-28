@@ -28,15 +28,16 @@ label { display: grid; gap: 6px; font-weight: 700; font-size: 0.88rem; }
 small, .muted { color: var(--muted); font-weight: 400; }
 .skip-link { position: absolute; left: -999px; top: 8px; background: white; padding: 8px; z-index: 10; }
 .skip-link:focus { left: 8px; }
-.topbar { display: flex; align-items: center; gap: 20px; padding: 12px 18px; background: var(--navy); color: white; flex-wrap: wrap; }
-.brand { display: flex; gap: 10px; align-items: center; color: white; text-decoration: none; min-width: 245px; }
+.topbar { display: flex; align-items: center; padding: 8px 28px; background: var(--navy); color: white; position: relative; }
+.brand { display: flex; gap: 10px; align-items: center; color: white; text-decoration: none; flex: 0 0 auto; }
 .brand small { display: block; color: #dbe6f4; font-size: 0.78rem; margin-top: 2px; }
-.brand-logo { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; background: white; padding: 4px; border: 2px solid rgba(255,255,255,0.12); }
+.brand-logo { width: 56px; height: 40px; border-radius: 6px; object-fit: contain; background: white; padding: 4px; border: 2px solid rgba(255,255,255,0.12); }
 .rail-mark { display: none; }
-nav { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
-nav a { color: white; text-decoration: none; padding: 10px 12px; border-radius: 4px; }
-nav a.active, nav a:hover { background: rgba(255,255,255,0.14); }
-.header-actions { display: flex; gap: 10px; align-items: center; }
+nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 26px; align-items: center; }
+nav a { color: white; text-decoration: none; padding: 8px 6px; border-radius: 2px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+.nav a.active { box-shadow: inset 0 -4px 0 var(--orange); color: white; }
+.nav a:hover { color: #fff; }
+.header-actions { margin-left: auto; display: flex; gap: 10px; align-items: center; }
 .header-actions select { width: auto; min-width: 112px; }
 .toggle { display: flex; align-items: center; gap: 6px; color: white; }
 .toggle input { width: 20px; min-height: 20px; }
@@ -140,7 +141,9 @@ dd { margin: 0; font-weight: 800; }
 .lite small, .lite footer { font-size: 0.82rem; }
 @media (max-width: 860px) {
   .topbar { align-items: stretch; }
-  .brand, nav, .header-actions { width: 100%; }
+  .brand { order: 1; }
+  nav { position: static; transform: none; order: 2; justify-content: center; width: 100%; }
+  .header-actions { order: 3; justify-content: flex-end; }
   nav a { flex: 1 1 auto; text-align: center; }
   main { padding: 12px; }
   .search-form { grid-template-columns: 1fr; }

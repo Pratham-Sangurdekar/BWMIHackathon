@@ -46,6 +46,7 @@ function layout(content: string) {
   const state = getState();
   app.className = state.liteMode ? "lite app-shell" : "app-shell";
   app.innerHTML = html`
+    <div class="top-time" id="top-time"></div>
     <header class="topbar">
       <a class="brand" href="#/book"><span class="rail-mark">RV</span><span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span></a>
       <nav aria-label="Primary">
@@ -66,6 +67,21 @@ function layout(content: string) {
   document.querySelector<HTMLInputElement>("#lite")?.addEventListener("change", (e) => setState({ liteMode: (e.target as HTMLInputElement).checked }));
 }
 
+// Update top-time element with India time every second
+function startIndiaTime() {
+  const el = document.getElementById('top-time');
+  if (!el) return;
+  function update() {
+    const now = new Date();
+    // convert to IST (UTC+5:30)
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const ist = new Date(utc + (5.5 * 60 * 60 * 1000));
+    if (el) el.textContent = ist.toLocaleString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  update();
+  setInterval(update, 1000);
+}
+
 function languageGate() {
   app.className = "app-shell";
   app.innerHTML = `<main class="language-screen" id="main"><section class="language-panel"><span class="rail-mark">RV</span><h1>${t.en.choose}</h1><p>RailVishwas / रेलविश्वास</p><div class="language-actions"><button data-lang="en">English</button><button data-lang="hi">हिन्दी</button></div></section></main>`;
@@ -83,8 +99,8 @@ function loginView() {
 }
 
 function stationInput(id: "from" | "to", title: string, selected: string) {
-  const items = stationsFor(selected).map((s: Station) => option(s.code, `${s.name} — ${s.city}, ${s.state} — ${s.code}`, s.code === selected)).join("");
-  return `<label class="station-field">${title}<input class="station-search" data-target="${id}" placeholder="${id === "from" ? "From station" : "To station"}" value="${stationLabel(selected)}" aria-describedby="${id}-hint"/><select id="${id}" name="${id}" size="6" aria-label="${title} station suggestions">${items}</select><small id="${id}-hint">Type city, station, code, or alias. Use arrow keys and Enter in the suggestion list.</small></label>`;
+  // visible text input + hidden value input + suggestions container
+  return `<label class="station-field">${title}<input class="station-search" data-target="${id}" placeholder="${id === "from" ? "From station" : "To station"}" value="${stationLabel(selected)}" aria-describedby="${id}-hint" autocomplete="off"/><input type="hidden" id="${id}" name="${id}" value="${selected}" /><div class="station-suggestions" data-target="${id}" role="listbox" aria-label="${title} station suggestions"></div><small id="${id}-hint">Type city, station, code, or alias. Use arrow keys and Enter to select.</small></label>`;
 }
 
 function calendar(selected: string) {
@@ -140,18 +156,55 @@ function readQuery(form: HTMLFormElement): SearchQuery {
 }
 
 function wireSearch() {
-  document.querySelectorAll<HTMLInputElement>(".station-search").forEach((input) => input.addEventListener("input", () => {
-    const select = document.querySelector<HTMLSelectElement>(`#${input.dataset.target}`);
-    if (select) select.innerHTML = stationsFor(input.value).map((s) => option(s.code, `${s.name} — ${s.city}, ${s.state} — ${s.code}`)).join("");
-  }));
-  document.querySelectorAll<HTMLSelectElement>(".station-field select").forEach((select) => select.addEventListener("change", () => {
-    const input = document.querySelector<HTMLInputElement>(`input[data-target="${select.id}"]`);
-    if (input) input.value = stationLabel(select.value);
-  }));
+  // Autocomplete: render suggestion rows into the suggestions container and handle keyboard
+  document.querySelectorAll<HTMLInputElement>(".station-search").forEach((input) => {
+    const target = String(input.dataset.target);
+    const suggestions = document.querySelector<HTMLDivElement>(`.station-suggestions[data-target="${target}"]`)!;
+    let active = -1;
+    const render = (items: Station[]) => {
+      suggestions.innerHTML = items.map((s, i) => `
+        <div role="option" tabindex="-1" class="station-suggestion" data-code="${s.code}" data-index="${i}">
+          <div class="station-suggestion-name">${s.name}</div>
+          <div class="station-suggestion-meta">${s.city}, ${s.state} • ${s.code}</div>
+        </div>
+      `).join("");
+      active = -1;
+    };
+    const update = () => {
+      const items = stationsFor(input.value).slice(0, 12);
+      render(items);
+    };
+    input.addEventListener("input", () => update());
+    input.addEventListener("keydown", (e) => {
+      const opts = Array.from(suggestions.querySelectorAll<HTMLDivElement>(".station-suggestion"));
+      if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(active + 1, opts.length - 1); opts.forEach((o,i)=>o.classList.toggle('active', i===active)); opts[active]?.scrollIntoView({block:'nearest'}); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, 0); opts.forEach((o,i)=>o.classList.toggle('active', i===active)); opts[active]?.scrollIntoView({block:'nearest'}); }
+      else if (e.key === "Enter") { if (active >= 0 && opts[active]) { e.preventDefault(); opts[active].click(); } }
+      else if (e.key === "Escape") { suggestions.innerHTML = ""; active = -1; }
+    });
+    suggestions.addEventListener("click", (ev) => {
+      const el = (ev.target as HTMLElement).closest('.station-suggestion') as HTMLDivElement | null;
+      if (!el) return;
+      const code = el.dataset.code!;
+      const hidden = document.querySelector<HTMLInputElement>(`#${target}`)!;
+      hidden.value = code;
+      input.value = stationLabel(code);
+      suggestions.innerHTML = "";
+      input.focus();
+    });
+    // close suggestions when clicking outside
+    document.addEventListener('click', (ev) => { if (!input.contains(ev.target as Node) && !suggestions.contains(ev.target as Node)) suggestions.innerHTML = ""; });
+  });
+  // removed <select> change handler; hidden inputs updated when suggestion chosen
   document.querySelector("#swap")?.addEventListener("click", () => {
-    const from = document.querySelector<HTMLSelectElement>("#from")!;
-    const to = document.querySelector<HTMLSelectElement>("#to")!;
-    [from.value, to.value] = [to.value, from.value];
+    const fromHidden = document.querySelector<HTMLInputElement>('#from')!;
+    const toHidden = document.querySelector<HTMLInputElement>('#to')!;
+    const fromInput = document.querySelector<HTMLInputElement>('input[data-target="from"]')!;
+    const toInput = document.querySelector<HTMLInputElement>('input[data-target="to"]')!;
+    const a = fromHidden.value; const b = toHidden.value;
+    fromHidden.value = b; toHidden.value = a;
+    fromInput.value = stationLabel(fromHidden.value);
+    toInput.value = stationLabel(toHidden.value);
     render();
   });
   document.querySelector("#prev-month")?.addEventListener("click", () => { calendarOffset = Math.max(0, calendarOffset - 1); render(); });
@@ -340,6 +393,9 @@ function render() {
   else bookView();
   wireGlobal();
 }
+
+// start India time when app loads
+startIndiaTime();
 
 window.addEventListener("hashchange", () => { route = location.hash.replace("#", "") || "/book"; message = ""; render(); });
 subscribe(render);

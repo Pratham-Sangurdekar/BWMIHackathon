@@ -59,7 +59,8 @@ export function searchStations(term: string, limit = 12): Station[] {
     })
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.s.name.localeCompare(b.s.name))
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((item) => item.s);
 }
 
 function addMins(time: string, mins: number) {

@@ -1,52 +1,96 @@
+import { stations } from "./stations.js";
+export { stations };
 export const BOOKING_WINDOW_MONTHS = 3;
-export const stations = [
-    ["MMCT", "Mumbai Central", "Mumbai", "West"], ["CSMT", "CSM Terminus", "Mumbai", "West"], ["LTT", "Lokmanya Tilak Terminus", "Mumbai", "West"], ["BDTS", "Bandra Terminus", "Mumbai", "West"],
-    ["NDLS", "New Delhi", "Delhi", "North"], ["NZM", "Hazrat Nizamuddin", "Delhi", "North"], ["ANVT", "Anand Vihar Terminal", "Delhi", "North"],
-    ["HWH", "Howrah Junction", "Kolkata", "East"], ["SDAH", "Sealdah", "Kolkata", "East"], ["MAS", "Chennai Central", "Chennai", "South"], ["SBC", "Bengaluru City", "Bengaluru", "South"],
-    ["SC", "Secunderabad Junction", "Hyderabad", "South"], ["PUNE", "Pune Junction", "Pune", "West"], ["ADI", "Ahmedabad Junction", "Ahmedabad", "West"], ["JP", "Jaipur Junction", "Jaipur", "North"],
-    ["LKO", "Lucknow NR", "Lucknow", "North"], ["BSB", "Varanasi Junction", "Varanasi", "North"], ["PNBE", "Patna Junction", "Patna", "East"], ["BPL", "Bhopal Junction", "Bhopal", "Central"],
-    ["INDB", "Indore Junction", "Indore", "Central"], ["NGP", "Nagpur Junction", "Nagpur", "Central"], ["DDN", "Dehradun", "Dehradun", "North"], ["CDG", "Chandigarh", "Chandigarh", "North"],
-    ["ASR", "Amritsar Junction", "Amritsar", "North"], ["JAT", "Jammu Tawi", "Jammu", "North"], ["GHY", "Guwahati", "Guwahati", "East"], ["BBS", "Bhubaneswar", "Bhubaneswar", "East"],
-    ["ERS", "Ernakulam Junction", "Kochi", "South"], ["TVC", "Thiruvananthapuram Central", "Thiruvananthapuram", "South"], ["CBE", "Coimbatore Junction", "Coimbatore", "South"],
-    ["MDU", "Madurai Junction", "Madurai", "South"], ["RNC", "Ranchi Junction", "Ranchi", "East"], ["R", "Raipur Junction", "Raipur", "Central"], ["ST", "Surat", "Surat", "West"],
-    ["BRC", "Vadodara Junction", "Vadodara", "West"], ["CNB", "Kanpur Central", "Kanpur", "North"], ["PRYJ", "Prayagraj Junction", "Prayagraj", "North"], ["AGC", "Agra Cantt", "Agra", "North"],
-    ["MTJ", "Mathura Junction", "Mathura", "North"], ["HW", "Haridwar", "Haridwar", "North"], ["RK", "Roorkee", "Roorkee", "North"], ["MTC", "Meerut City", "Meerut", "North"], ["GZB", "Ghaziabad", "Ghaziabad", "North"]
-].map(([code, name, city, region]) => ({ code, name, city, region, nearby: [] }));
-function cls(base, availability = "AVAILABLE") {
-    return [
-        { classCode: "SL", fare: Math.round(base * 0.55), availability, seats: availability === "AVAILABLE" ? 42 : 0 },
-        { classCode: "3A", fare: base, availability, seats: availability === "AVAILABLE" ? 18 : 0 },
-        { classCode: "2A", fare: Math.round(base * 1.45), availability: availability === "AVAILABLE" ? "RAC" : availability, seats: 6 },
-        { classCode: "1A", fare: Math.round(base * 2.2), availability: "WL", seats: 0 }
-    ];
+const hubs = ["NDLS", "NZM", "MMCT", "CSMT", "SBC", "MAS", "HWH", "SC", "ADI", "PUNE", "JP", "BPL", "NGP", "LKO", "BSB", "PNBE", "MAO", "DDN"];
+const trainNames = ["Rajdhani Express", "Shatabdi Express", "Duronto Express", "Vande Bharat Express", "Jan Shatabdi", "Sampark Kranti", "Superfast Express", "Intercity Express", "Mail Express", "Humsafar Express", "Garib Rath", "Tejas Express"];
+const classes = ["1A", "2A", "3A", "SL", "CC", "EC", "2S"];
+const availabilityRank = { AVAILABLE: 4, RAC: 3, WL: 2, NOT_AVAILABLE: 1 };
+export function hashText(text) {
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i += 1) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
 }
-const trainRows = [
-    ["12951", "Mumbai Rajdhani Express", "MMCT", "NDLS", "16:55", "08:35", 940, cls(2650)], ["12953", "August Kranti Rajdhani", "MMCT", "NZM", "17:10", "10:55", 1065, cls(2450)],
-    ["12017", "Dehradun Shatabdi", "NDLS", "DDN", "06:45", "12:55", 370, [{ classCode: "CC", fare: 900, availability: "AVAILABLE", seats: 28 }, { classCode: "EC", fare: 1710, availability: "RAC", seats: 4 }]],
-    ["22691", "Rajdhani Express", "SBC", "NZM", "20:00", "05:55", 2035, cls(3100)], ["12627", "Karnataka Express", "SBC", "NDLS", "19:20", "10:50", 2370, cls(1850)],
-    ["12295", "Sanghamitra Express", "SBC", "PNBE", "09:10", "07:40", 2790, cls(1780)], ["12840", "Chennai Howrah Mail", "MAS", "HWH", "19:20", "03:55", 1955, cls(1670)],
-    ["12859", "Gitanjali Express", "CSMT", "HWH", "06:00", "13:05", 1865, cls(1980)], ["12262", "Howrah Duronto", "HWH", "CSMT", "08:20", "11:25", 1625, cls(2200)],
-    ["12723", "Telangana Express", "SC", "NDLS", "06:25", "07:40", 1515, cls(1750)], ["12957", "Swarna Jayanti Rajdhani", "ADI", "NDLS", "17:45", "07:30", 825, cls(2100)],
-    ["12915", "Ashram Express", "ADI", "DLI", "19:00", "10:10", 910, cls(1200)], ["12985", "Double Decker", "JP", "NDLS", "06:00", "10:25", 265, [{ classCode: "CC", fare: 650, availability: "AVAILABLE", seats: 54 }]],
-    ["12559", "Shiv Ganga Express", "BSB", "NDLS", "22:15", "08:25", 610, cls(1120)], ["12309", "Rajendra Nagar Tejas", "PNBE", "NDLS", "19:10", "07:40", 750, cls(1650)],
-    ["12155", "Bhopal Express", "BPL", "NZM", "21:05", "07:50", 645, cls(1100)], ["12919", "Malwa Express", "INDB", "JAT", "12:15", "16:10", 1675, cls(1520)],
-    ["12617", "Mangala Lakshadweep", "ERS", "NZM", "13:25", "13:15", 2870, cls(2600)], ["12423", "Dibrugarh Rajdhani", "NDLS", "GHY", "16:20", "19:25", 1625, cls(2850)],
-    ["12801", "Purushottam Express", "PURI", "NDLS", "21:45", "04:00", 1815, cls(1620)], ["12129", "Azad Hind Express", "PUNE", "HWH", "18:35", "03:55", 2000, cls(1650)],
-    ["12137", "Punjab Mail", "CSMT", "FZR", "19:35", "05:10", 2015, cls(1580)], ["12029", "Swarna Shatabdi", "NDLS", "ASR", "07:20", "13:30", 370, [{ classCode: "CC", fare: 880, availability: "AVAILABLE", seats: 32 }, { classCode: "EC", fare: 1640, availability: "AVAILABLE", seats: 7 }]],
-    ["19019", "Dehradun Express", "BDTS", "HW", "00:05", "15:55", 2390, cls(1350, "WL")], ["22917", "Haridwar SF Express", "BDTS", "HW", "12:45", "14:40", 1555, cls(1720)]
-];
-export const trains = trainRows.map(([number, name, from, to, depart, arrive, durationMins, classes]) => ({ number, name, from, to, depart, arrive, durationMins, days: [0, 1, 2, 3, 4, 5, 6], classes }));
+function rng(seed) {
+    let value = seed || 1;
+    return () => {
+        value = Math.imul(1664525, value) + 1013904223;
+        return (value >>> 0) / 4294967296;
+    };
+}
 export function station(code) {
     const found = stations.find((s) => s.code === code);
     if (!found)
         throw new Error(`Missing mock station ${code}`);
     return found;
 }
-export function searchStations(term) {
+function searchable(s) {
+    return `${s.code} ${s.name} ${s.city} ${s.state} ${s.region} ${s.zone} ${s.aliases.join(" ")}`.toLowerCase();
+}
+export function searchStations(term, limit = 12) {
     const q = term.trim().toLowerCase();
     if (!q)
-        return stations.slice(0, 8);
-    return stations.filter((s) => `${s.city} ${s.name} ${s.code}`.toLowerCase().includes(q)).slice(0, 8);
+        return stations.filter((s) => s.category === "major").slice(0, limit);
+    return stations
+        .map((s) => {
+        const name = s.name.toLowerCase();
+        const city = s.city.toLowerCase();
+        const code = s.code.toLowerCase();
+        const aliases = s.aliases.join(" ").toLowerCase();
+        let score = 0;
+        if (name === q)
+            score += 1000;
+        if (code === q)
+            score += 950;
+        if (name.startsWith(q))
+            score += 800;
+        if (code.startsWith(q))
+            score += 760;
+        if (city === q)
+            score += 680;
+        if (city.startsWith(q))
+            score += 620;
+        if (aliases.includes(q))
+            score += 520;
+        if (searchable(s).includes(q))
+            score += 220;
+        if (s.category === "major")
+            score += 80;
+        return { s, score };
+    })
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score || a.s.name.localeCompare(b.s.name))
+        .slice(0, limit)
+        .map((item) => item.s);
+}
+function addMins(time, mins) {
+    const [h, m] = time.split(":").map(Number);
+    const total = h * 60 + m + mins;
+    return `${Math.floor((total % 1440) / 60).toString().padStart(2, "0")}:${(total % 60).toString().padStart(2, "0")}`;
+}
+function durationBetween(a, b, random) {
+    const regionGap = a.region === b.region ? 0 : 1;
+    const majorBonus = a.category === "major" && b.category === "major" ? -90 : 80;
+    return Math.max(110, 250 + regionGap * 520 + Math.floor(random() * 820) + majorBonus);
+}
+function classInfos(base, random, selected) {
+    const availability = ["AVAILABLE", "AVAILABLE", "AVAILABLE", "RAC", "WL", "NOT_AVAILABLE"];
+    return classes.map((classCode) => {
+        const multiplier = { "2S": 0.25, SL: 0.42, "3A": 1, "2A": 1.45, "1A": 2.35, CC: 0.72, EC: 1.55 };
+        const picked = classCode === selected ? availability[Math.floor(random() * 4)] : availability[Math.floor(random() * availability.length)];
+        return { classCode, fare: Math.max(90, Math.round(base * multiplier[classCode])), availability: picked, seats: picked === "AVAILABLE" ? 4 + Math.floor(random() * 70) : picked === "RAC" ? 1 + Math.floor(random() * 12) : 0 };
+    });
+}
+function train(from, to, query, seed, serial) {
+    const random = rng(seed + serial * 971);
+    const depart = `${Math.floor(random() * 24).toString().padStart(2, "0")}:${(Math.floor(random() * 4) * 15).toString().padStart(2, "0")}`;
+    const durationMins = durationBetween(from, to, random);
+    const number = `${10000 + ((seed + serial * 137) % 89999)}`;
+    const name = `${from.city}-${to.city} ${trainNames[serial % trainNames.length]}`;
+    const baseFare = Math.round(450 + durationMins * (0.75 + random()));
+    return { number, name, from: from.code, to: to.code, depart, arrive: addMins(depart, durationMins), durationMins, days: [0, 1, 2, 3, 4, 5, 6].filter((d) => (d + serial + seed) % 5 !== 0), classes: classInfos(baseFare, random, query.classCode) };
 }
 function fareFor(t, query) {
     const info = t.classes.find((c) => c.classCode === query.classCode) || t.classes[0];
@@ -57,33 +101,63 @@ function fareFor(t, query) {
         fare *= 0.85;
     if (query.quota === "TQ")
         fare *= 1.25;
+    if (query.quota === "PT")
+        fare *= 1.45;
     return Math.round(fare);
 }
 function availabilityFor(legs, query) {
     const states = legs.map((leg) => (leg.train.classes.find((c) => c.classCode === query.classCode) || leg.train.classes[0]).availability);
-    if (states.includes("NOT_AVAILABLE"))
-        return "NOT_AVAILABLE";
-    if (states.includes("WL"))
-        return "WL";
-    if (states.includes("RAC"))
-        return "RAC";
-    return "AVAILABLE";
+    return states.sort((a, b) => availabilityRank[a] - availabilityRank[b])[0];
+}
+function journey(date, kind, legs, query, id, transferMins) {
+    return {
+        id, date, kind, legs, transferMins,
+        totalFare: legs.reduce((sum, leg) => sum + fareFor(leg.train, query), 0),
+        availability: availabilityFor(legs, query),
+        durationMins: legs.reduce((sum, leg) => sum + leg.train.durationMins, 0) + (transferMins || 0)
+    };
+}
+function routeLikelyNoResult(query, from, to) {
+    if (from.category === "major" || to.category === "major")
+        return false;
+    return hashText(`${query.from}-${query.to}-${query.date}-${query.classCode}-${query.quota}`) % 10 === 0;
+}
+function transferCandidates(from, to, seed) {
+    const preferred = hubs.map(station).filter((s) => s.code !== from.code && s.code !== to.code);
+    const sameRegion = stations.filter((s) => s.category === "major" && (s.region === from.region || s.region === to.region));
+    return [...preferred, ...sameRegion].filter((s, i, arr) => arr.findIndex((x) => x.code === s.code) === i).sort((a, b) => (hashText(a.code + seed) % 100) - (hashText(b.code + seed) % 100)).slice(0, 24);
+}
+export function searchTrains(query) {
+    const from = station(query.from);
+    const to = station(query.to);
+    const seed = hashText(`${query.from}|${query.to}|${query.date}|${query.classCode}|${query.quota}`);
+    if (routeLikelyNoResult(query, from, to))
+        return { directJourneys: [], connectingJourneys: [], metadata: { totalResults: 0, searchId: `SR-${seed}`, generatedAt: new Date().toISOString() } };
+    const directCount = from.region === to.region || from.category === "major" || to.category === "major" ? 12 + (seed % 18) : 0;
+    const directJourneys = [];
+    for (let i = 0; i < directCount; i += 1) {
+        const legTrain = train(from, to, query, seed, i);
+        directJourneys.push(journey(query.date, "direct", [{ train: legTrain, from, to }], query, `${query.date}-${legTrain.number}`));
+    }
+    const connectingJourneys = [];
+    const transfers = transferCandidates(from, to, seed);
+    for (let i = 0; i < transfers.length && directJourneys.length + connectingJourneys.length < 96; i += 1) {
+        const via = transfers[i];
+        const first = train(from, via, query, seed, 100 + i);
+        const second = train(via, to, query, seed, 200 + i);
+        const wait = 55 + ((seed + i * 23) % 210);
+        connectingJourneys.push(journey(query.date, "connecting", [{ train: first, from, to: via }, { train: second, from: via, to }], query, `${query.date}-${first.number}-${second.number}`, wait));
+    }
+    while (directJourneys.length + connectingJourneys.length < 60) {
+        const i = connectingJourneys.length + 50;
+        const via = transfers[i % transfers.length] || station("NDLS");
+        const first = train(from, via, query, seed, 300 + i);
+        const second = train(via, to, query, seed, 400 + i);
+        connectingJourneys.push(journey(query.date, "connecting", [{ train: first, from, to: via }, { train: second, from: via, to }], query, `${query.date}-${first.number}-${second.number}`, 70 + (i % 180)));
+    }
+    return { directJourneys, connectingJourneys, metadata: { totalResults: directJourneys.length + connectingJourneys.length, searchId: `SR-${seed}`, generatedAt: new Date().toISOString() } };
 }
 export function searchJourneys(query) {
-    const direct = trains.filter((t) => t.from === query.from && t.to === query.to);
-    const directResults = direct.map((train) => {
-        const legs = [{ train, from: station(train.from), to: station(train.to) }];
-        return { id: `${query.date}-${train.number}`, date: query.date, kind: "direct", legs, totalFare: fareFor(train, query), availability: availabilityFor(legs, query), durationMins: train.durationMins };
-    });
-    if (directResults.length)
-        return directResults;
-    const connecting = [];
-    for (const first of trains.filter((t) => t.from === query.from)) {
-        for (const second of trains.filter((t) => t.from === first.to && t.to === query.to)) {
-            const transferMins = 135;
-            const legs = [{ train: first, from: station(first.from), to: station(first.to) }, { train: second, from: station(second.from), to: station(second.to) }];
-            connecting.push({ id: `${query.date}-${first.number}-${second.number}`, date: query.date, kind: "connecting", legs, totalFare: fareFor(first, query) + fareFor(second, query), availability: availabilityFor(legs, query), durationMins: first.durationMins + second.durationMins + transferMins, transferMins });
-        }
-    }
-    return connecting.slice(0, 5);
+    const response = searchTrains(query);
+    return [...response.directJourneys, ...response.connectingJourneys];
 }

@@ -41,6 +41,21 @@ nav a.active, nav a:hover { background: rgba(255,255,255,0.14); }
 .toggle input { width: 20px; min-height: 20px; }
 main { padding: 22px; width: min(1480px, 100%); margin: 0 auto; flex: 1; }
 footer { padding: 16px 22px; color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); background: white; }
+.top-time { text-align: center; padding: 6px 12px; font-weight: 700; color: var(--muted); background: transparent; }
+
+/* Sign-in page background image (shown only when body has .signin-bg) */
+body.signin-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url('/Vande Bharat Red Gray.jpg');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right center;
+  opacity: 0.10;
+  pointer-events: none;
+  z-index: -1;
+}
 .language-screen { min-height: 100vh; display: grid; place-items: center; background: var(--navy); color: white; }
 .language-panel { width: min(420px, calc(100vw - 32px)); border: 1px solid rgba(255,255,255,0.28); padding: 28px; border-radius: 8px; }
 .language-panel h1 { margin-bottom: 6px; }
@@ -53,6 +68,13 @@ footer { padding: 16px 22px; color: var(--muted); font-size: 0.9rem; border-top:
 .search-form label { grid-column: span 2; }
 .station-field { grid-column: span 3; }
 .station-field select { min-height: 174px; overflow: auto; }
+/* Custom station suggestion list */
+.station-suggestions { border: 1px solid var(--line); background: white; max-height: 240px; overflow: auto; border-radius: 6px; margin-top: 8px; }
+.station-suggestion { padding: 8px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.station-suggestion:last-child { border-bottom: none; }
+.station-suggestion:hover, .station-suggestion.active { background: #eef6ff; }
+.station-suggestion-name { font-weight: 800; }
+.station-suggestion-meta { color: var(--muted); font-size: 0.9rem; }
 .calendar-field { grid-column: span 4; display: grid; gap: 6px; font-weight: 700; font-size: 0.88rem; }
 .calendar { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fbfcfe; }
 .calendar-nav { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; margin-bottom: 10px; text-align: center; }

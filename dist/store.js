@@ -1,5 +1,5 @@
 const key = "railvishwas-state-v1";
-const initial = { liteMode: false, trips: [], attempts: [] };
+const initial = { liteMode: false, gridDensity: "comfortable", resultsPerPage: 50, trips: [], attempts: [] };
 export function loadState() {
     try {
         return { ...initial, ...JSON.parse(localStorage.getItem(key) || "{}") };

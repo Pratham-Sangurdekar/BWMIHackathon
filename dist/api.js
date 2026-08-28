@@ -5,9 +5,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 const event = (label) => ({ time: now(), label });
 export function maxBookingDate() {
-    const d = new Date();
-    d.setMonth(d.getMonth() + BOOKING_WINDOW_MONTHS);
-    return d.toISOString().slice(0, 10);
+    const nowDate = new Date();
+    return new Date(nowDate.getFullYear(), nowDate.getMonth() + BOOKING_WINDOW_MONTHS, 0).toISOString().slice(0, 10);
 }
 export function today() {
     return new Date().toISOString().slice(0, 10);
@@ -17,11 +16,12 @@ export function validateBookingDate(date) {
         return "Please select a journey date.";
     const selected = new Date(`${date}T00:00:00`);
     const min = new Date(`${today()}T00:00:00`);
-    const max = new Date(`${maxBookingDate()}T00:00:00`);
+    const current = new Date();
+    const max = new Date(current.getFullYear(), current.getMonth() + BOOKING_WINDOW_MONTHS, 0);
     if (selected < min)
         return "Journey date cannot be in the past.";
     if (selected > max)
-        return "Bookings are available only up to 3 months in advance.";
+        return "Bookings are available for this month and the next two months.";
     return undefined;
 }
 export async function login(email, password) {

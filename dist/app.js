@@ -1,4 +1,4 @@
-import { bookingMeaning, checkBookingStatus, duplicateAttempt, login, maxBookingDate, search, startBooking, stationLabel, stationsFor, today, validateBookingDate } from "./api.js";
+import { bookingMeaning, checkBookingStatus, duplicateAttempt, login, search, stationLabel, stationsFor, startBooking, today, validateBookingDate } from "./api.js";
 import { BOOKING_WINDOW_MONTHS } from "./data.js";
 import { getState, setState, subscribe } from "./store.js";
 const app = document.querySelector("#app");
@@ -6,41 +6,48 @@ let route = location.hash.replace("#", "") || "/book";
 let results = [];
 let activeAttempt;
 let lastQuery;
+let detailJourney;
 let loading = "";
 let message = "";
 let duplicateNotice = "";
+let page = 1;
+let calendarOffset = 0;
+let sortBy = "recommended";
+let filters = { journeyType: "all", departure: "all", arrival: "all", availability: "all", maxDuration: 72 * 60, maxFare: 12000, via: "", classCode: "all", quota: "all" };
 let tripsFilter = "upcoming";
 const t = {
-    en: { choose: "Choose your language", continue: "Continue", book: "Book", trips: "My Trips", pnr: "PNR", help: "Help", account: "Account", signIn: "Sign in", logout: "Logout" },
-    hi: { choose: "अपनी भाषा चुनें", continue: "जारी रखें", book: "बुक करें", trips: "मेरी यात्राएं", pnr: "PNR", help: "सहायता", account: "खाता", signIn: "साइन इन", logout: "लॉग आउट" }
+    en: { choose: "Choose your language", book: "Book Ticket", trips: "My Trips", pnr: "PNR", help: "Help", account: "Account", signIn: "Sign in", logout: "Logout" },
+    hi: { choose: "अपनी भाषा चुनें", book: "टिकट बुक करें", trips: "मेरी यात्राएं", pnr: "PNR", help: "सहायता", account: "खाता", signIn: "साइन इन", logout: "लॉग आउट" }
 };
-function label(key) {
-    return t[getState().language || "en"][key];
+function html(strings, ...values) { return strings.map((s, i) => s + (values[i] ?? "")).join(""); }
+function label(key) { return t[getState().language || "en"][key]; }
+function option(value, text, selected) { return `<option value="${value}" ${selected ? "selected" : ""}>${text}</option>`; }
+function mins(value) { return `${Math.floor(value / 60)}h ${value % 60}m`; }
+function dateLabel(value) { return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
+function quotaLabel(code) { return { all: "All quotas", GN: "General", TQ: "Tatkal", PT: "Premium Tatkal", LD: "Ladies", SS: "Senior Citizen" }[code]; }
+function classLabel(code) { return code === "all" ? "All classes" : code; }
+function availabilityScore(value) { return { AVAILABLE: 4, RAC: 3, WL: 2, NOT_AVAILABLE: 1 }[value]; }
+function timeBucket(time) {
+    const hour = Number(time.slice(0, 2));
+    if (hour < 6)
+        return "early";
+    if (hour < 12)
+        return "morning";
+    if (hour < 17)
+        return "afternoon";
+    if (hour < 21)
+        return "evening";
+    return "night";
 }
-function html(strings, ...values) {
-    return strings.map((s, i) => s + (values[i] ?? "")).join("");
-}
-function option(value, text, selected) {
-    return `<option value="${value}" ${selected ? "selected" : ""}>${text}</option>`;
-}
-function mins(value) {
-    const h = Math.floor(value / 60);
-    const m = value % 60;
-    return `${h}h ${m}m`;
-}
-function requireAuth() {
-    if (!getState().user && route !== "/account")
-        route = "/account";
-}
+function requireAuth() { if (!getState().user && route !== "/account")
+    route = "/account"; }
 function layout(content) {
     const state = getState();
-    app.className = state.liteMode ? "lite" : "";
+    app.className = state.liteMode ? "lite app-shell" : "app-shell";
     app.innerHTML = html `
+    <div class="top-time" id="top-time"></div>
     <header class="topbar">
-      <a class="brand" href="#/book" aria-label="RailVishwas home">
-        <span class="rail-mark">RV</span>
-        <span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span>
-      </a>
+      <a class="brand" href="#/book"><span class="rail-mark">RV</span><span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span></a>
       <nav aria-label="Primary">
         <a class="${route === "/book" ? "active" : ""}" href="#/book">${label("book")}</a>
         <a class="${route === "/trips" ? "active" : ""}" href="#/trips">${label("trips")}</a>
@@ -49,48 +56,40 @@ function layout(content) {
         <a class="${route === "/account" ? "active" : ""}" href="#/account">${label("account")}</a>
       </nav>
       <div class="header-actions">
-        <select id="language-control" aria-label="Change language">
-          ${option("en", "English", state.language === "en")}${option("hi", "हिन्दी", state.language === "hi")}
-        </select>
+        <select id="language-control" aria-label="Change language">${option("en", "English", state.language === "en")}${option("hi", "हिन्दी", state.language === "hi")}</select>
         <label class="toggle"><input id="lite" type="checkbox" ${state.liteMode ? "checked" : ""}/> Lite</label>
       </div>
     </header>
     <main id="main" tabindex="-1">${content}</main>
-    <footer>Prototype — railway, payment and refund data are simulated. Do not enter real payment, OTP, Aadhaar, or IRCTC credentials.</footer>
-  `;
+    <footer>Prototype — railway, payment and refund data are simulated. Do not enter real payment, OTP, Aadhaar, or IRCTC credentials.</footer>`;
     document.querySelector("#language-control")?.addEventListener("change", (e) => setState({ language: e.target.value }));
     document.querySelector("#lite")?.addEventListener("change", (e) => setState({ liteMode: e.target.checked }));
 }
+// Update top-time element with India time every second
+function startIndiaTime() {
+    const el = document.getElementById('top-time');
+    if (!el)
+        return;
+    function update() {
+        const now = new Date();
+        // convert to IST (UTC+5:30)
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const ist = new Date(utc + (5.5 * 60 * 60 * 1000));
+        if (el)
+            el.textContent = ist.toLocaleString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    update();
+    setInterval(update, 1000);
+}
 function languageGate() {
-    app.innerHTML = html `
-    <main class="language-screen" id="main">
-      <section class="language-panel" aria-labelledby="language-title">
-        <span class="rail-mark">RV</span>
-        <h1 id="language-title">${t.en.choose}</h1>
-        <p>RailVishwas / रेलविश्वास</p>
-        <div class="language-actions">
-          <button data-lang="en">English</button>
-          <button data-lang="hi">हिन्दी</button>
-        </div>
-      </section>
-    </main>`;
+    app.className = "app-shell";
+    app.innerHTML = `<main class="language-screen" id="main"><section class="language-panel"><span class="rail-mark">RV</span><h1>${t.en.choose}</h1><p>RailVishwas / रेलविश्वास</p><div class="language-actions"><button data-lang="en">English</button><button data-lang="hi">हिन्दी</button></div></section></main>`;
     document.querySelectorAll("[data-lang]").forEach((button) => button.addEventListener("click", () => setState({ language: button.dataset.lang })));
 }
 function loginView() {
-    layout(html `
-    <section class="narrow">
-      <h1>${label("signIn")}</h1>
-      <p class="muted">Use demo credentials: <strong>demo@railvishwas.in</strong> / <strong>demo1234</strong></p>
-      <form id="login-form" class="form">
-        <label>Email address<input id="email" name="email" autocomplete="email" /></label>
-        <label>Password<input id="password" name="password" type="password" autocomplete="current-password" /></label>
-        <p id="login-error" class="error" role="alert">${message}</p>
-        <button type="submit">${label("signIn")}</button>
-      </form>
-    </section>`);
+    layout(`<section class="panel narrow"><h1>${label("signIn")}</h1><p class="muted">Use demo credentials: <strong>demo@railvishwas.in</strong> / <strong>demo1234</strong></p><form id="login-form" class="form"><label>Email address<input id="email" name="email" autocomplete="email" /></label><label>Password<input id="password" name="password" type="password" autocomplete="current-password" /></label><p class="error" role="alert">${message}</p><button type="submit">${label("signIn")}</button></form></section>`);
     document.querySelector("#login-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
-        message = "";
         const form = new FormData(e.target);
         try {
             setState({ user: await login(String(form.get("email")), String(form.get("password"))) });
@@ -104,137 +103,278 @@ function loginView() {
     });
 }
 function stationInput(id, title, selected) {
-    const items = stationsFor(selected || "").map((s) => option(s.code, `${s.city} — ${s.name} (${s.code})`, s.code === selected)).join("");
-    return `<label>${title}<input class="station-search" data-target="${id}" placeholder="City, station or code" value="${selected || ""}" aria-describedby="${id}-hint"/><select id="${id}" name="${id}" aria-label="${title} station">${items}</select><small id="${id}-hint">Search by city, station name, or code.</small></label>`;
+    // visible text input + hidden value input + suggestions container
+    return `<label class="station-field">${title}<input class="station-search" data-target="${id}" placeholder="${id === "from" ? "From station" : "To station"}" value="${stationLabel(selected)}" aria-describedby="${id}-hint" autocomplete="off"/><input type="hidden" id="${id}" name="${id}" value="${selected}" /><div class="station-suggestions" data-target="${id}" role="listbox" aria-label="${title} station suggestions"></div><small id="${id}-hint">Type city, station, code, or alias. Use arrow keys and Enter to select.</small></label>`;
+}
+function calendar(selected) {
+    const nowDate = new Date();
+    const visible = new Date(nowDate.getFullYear(), nowDate.getMonth() + calendarOffset, 1);
+    const first = new Date(visible.getFullYear(), visible.getMonth(), 1);
+    const days = new Date(visible.getFullYear(), visible.getMonth() + 1, 0).getDate();
+    const cells = Array.from({ length: first.getDay() }, () => `<span class="day empty"></span>`);
+    for (let day = 1; day <= days; day += 1) {
+        const iso = new Date(visible.getFullYear(), visible.getMonth(), day).toISOString().slice(0, 10);
+        const disabled = Boolean(validateBookingDate(iso));
+        cells.push(`<button type="button" class="day ${iso === today() ? "today" : ""} ${iso === selected ? "selected" : ""}" data-date="${iso}" ${disabled ? "disabled" : ""}>${day}</button>`);
+    }
+    return `<div class="calendar-field"><span>DATE</span><input type="hidden" name="date" value="${selected}" /><div class="calendar"><div class="calendar-nav"><button type="button" id="prev-month" ${calendarOffset === 0 ? "disabled" : ""}>Previous Month</button><strong>${visible.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</strong><button type="button" id="next-month" ${calendarOffset >= 2 ? "disabled" : ""}>Next Month</button></div><div class="weekday"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="calendar-grid">${cells.join("")}</div><small>Bookings are available for this month and the next two months.</small></div></div>`;
+}
+function searchSubHeader() {
+    if (!lastQuery)
+        return "";
+    return `<section class="journey-subheader"><button data-edit-search="from">${stationLabel(lastQuery.from)}</button><span>→</span><button data-edit-search="to">${stationLabel(lastQuery.to)}</button><button data-edit-search="date">${dateLabel(lastQuery.date)}</button><button data-edit-search="passengers">${lastQuery.passengers} passenger${lastQuery.passengers > 1 ? "s" : ""}</button><button data-edit-search="class">${lastQuery.classCode}</button><button data-edit-search="quota">${quotaLabel(lastQuery.quota)}</button><button id="modify-search">Modify Search</button></section>`;
 }
 function bookView() {
-    const date = lastQuery?.date || today();
-    const form = html `
+    const selectedDate = lastQuery?.date || today();
+    layout(searchSubHeader() + `
     <section class="search-band">
-      <div>
-        <h1>Book with certainty</h1>
-        <p>Search trains, review the fare, and get a clear answer if payment or booking confirmation is delayed.</p>
-      </div>
+      <div><h1>Book with certainty</h1><p>Search trains, review fare and availability, and get a clear answer if booking confirmation is delayed.</p></div>
       <form id="search-form" class="search-form" novalidate>
         ${stationInput("from", "FROM", lastQuery?.from || "MMCT")}
         <button type="button" id="swap" class="icon-button" aria-label="Swap FROM and TO">⇄</button>
         ${stationInput("to", "TO", lastQuery?.to || "NDLS")}
-        <label>DATE<input name="date" type="date" min="${today()}" max="${maxBookingDate()}" value="${date}" /></label>
-        <label>CLASS<select name="classCode">${["SL", "3A", "2A", "1A", "CC", "EC"].map((c) => option(c, c, c === (lastQuery?.classCode || "3A"))).join("")}</select></label>
-        <label>QUOTA<select name="quota">${option("GN", "General", lastQuery?.quota === "GN" || !lastQuery)}${option("TQ", "Tatkal", lastQuery?.quota === "TQ")}${option("LD", "Ladies", lastQuery?.quota === "LD")}${option("SS", "Senior Citizen", lastQuery?.quota === "SS")}</select></label>
+        ${calendar(selectedDate)}
+        <label>CLASS<select name="classCode">${["SL", "3A", "2A", "1A", "CC", "EC", "2S"].map((c) => option(c, c, c === (lastQuery?.classCode || "3A"))).join("")}</select></label>
+        <label>QUOTA<select name="quota">${["GN", "TQ", "PT", "LD", "SS"].map((q) => option(q, quotaLabel(q), q === (lastQuery?.quota || "GN"))).join("")}</select></label>
         <label>PASSENGERS<input name="passengers" type="number" min="1" max="6" value="${lastQuery?.passengers || 1}" /></label>
         <label class="check"><input name="flexible" type="checkbox" ${lastQuery?.flexible ? "checked" : ""}/> Flexible with date</label>
-        <label class="check"><input id="disability" name="disability" type="checkbox" ${lastQuery?.disability ? "checked" : ""}/> Person with disability concession</label>
-        <label class="conditional">Mock disability ID<input name="disabilityId" value="${lastQuery?.disabilityId || ""}" /></label>
-        <label class="check"><input id="railPass" name="railPass" type="checkbox" ${lastQuery?.railPass ? "checked" : ""}/> Railway pass concession</label>
-        <label class="conditional">Mock pass number<input name="passNumber" value="${lastQuery?.passNumber || ""}" /></label>
+        <label class="check"><input name="disability" type="checkbox" ${lastQuery?.disability ? "checked" : ""}/> Person with disability concession</label>
+        <label>Mock disability ID<input name="disabilityId" value="${lastQuery?.disabilityId || ""}" /></label>
+        <label class="check"><input name="railPass" type="checkbox" ${lastQuery?.railPass ? "checked" : ""}/> Railway pass concession</label>
+        <label>Mock pass number<input name="passNumber" value="${lastQuery?.passNumber || ""}" /></label>
         <label>DEMO SCENARIO<select name="scenario">${option("normal", "Normal successful booking", lastQuery?.scenario === "normal" || !lastQuery)}${option("unknownBooked", "Payment success → unknown → booked", lastQuery?.scenario === "unknownBooked")}${option("unknownNotBooked", "Payment success → unknown → refund", lastQuery?.scenario === "unknownNotBooked")}${option("paymentFailed", "Payment failed → safe retry", lastQuery?.scenario === "paymentFailed")}</select></label>
+        <p id="search-error" class="error" role="alert">${message && !results.length ? message : ""}</p>
         <button type="submit">Search trains</button>
       </form>
-      <p class="rule">Bookings are available from ${today()} to ${maxBookingDate()} (${BOOKING_WINDOW_MONTHS} months).</p>
-    </section>`;
-    layout(form + statusPanel() + resultsView());
+      <p class="rule">Calendar window: current month + next two months (${BOOKING_WINDOW_MONTHS} calendar months).</p>
+    </section>
+    ${statusPanel()}${detailJourney ? detailView(detailJourney) : resultsShell()}`);
     wireSearch();
 }
 function readQuery(form) {
     const data = new FormData(form);
-    return {
-        from: String(data.get("from")), to: String(data.get("to")), date: String(data.get("date")), classCode: String(data.get("classCode")),
-        quota: String(data.get("quota")), passengers: Number(data.get("passengers") || 1), flexible: data.has("flexible"),
-        disability: data.has("disability"), disabilityId: String(data.get("disabilityId") || ""), railPass: data.has("railPass"), passNumber: String(data.get("passNumber") || ""),
-        scenario: String(data.get("scenario") || "normal")
-    };
+    return { from: String(data.get("from")), to: String(data.get("to")), date: String(data.get("date")), classCode: String(data.get("classCode")), quota: String(data.get("quota")), passengers: Number(data.get("passengers") || 1), flexible: data.has("flexible"), disability: data.has("disability"), disabilityId: String(data.get("disabilityId") || ""), railPass: data.has("railPass"), passNumber: String(data.get("passNumber") || ""), scenario: String(data.get("scenario") || "normal") };
 }
 function wireSearch() {
-    document.querySelectorAll(".station-search").forEach((input) => input.addEventListener("input", () => {
-        const select = document.querySelector(`#${input.dataset.target}`);
-        if (!select)
-            return;
-        select.innerHTML = stationsFor(input.value).map((s) => option(s.code, `${s.city} — ${s.name} (${s.code})`)).join("");
-    }));
-    document.querySelector("#swap")?.addEventListener("click", () => {
-        const from = document.querySelector("#from");
-        const to = document.querySelector("#to");
-        [from.value, to.value] = [to.value, from.value];
+    // Autocomplete: render suggestion rows into the suggestions container and handle keyboard
+    document.querySelectorAll(".station-search").forEach((input) => {
+        const target = String(input.dataset.target);
+        const suggestions = document.querySelector(`.station-suggestions[data-target="${target}"]`);
+        let active = -1;
+        const render = (items) => {
+            suggestions.innerHTML = items.map((s, i) => `
+        <div role="option" tabindex="-1" class="station-suggestion" data-code="${s.code}" data-index="${i}">
+          <div class="station-suggestion-name">${s.name}</div>
+          <div class="station-suggestion-meta">${s.city}, ${s.state} • ${s.code}</div>
+        </div>
+      `).join("");
+            active = -1;
+        };
+        const update = () => {
+            const items = stationsFor(input.value).slice(0, 12);
+            render(items);
+        };
+        input.addEventListener("input", () => update());
+        input.addEventListener("keydown", (e) => {
+            const opts = Array.from(suggestions.querySelectorAll(".station-suggestion"));
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                active = Math.min(active + 1, opts.length - 1);
+                opts.forEach((o, i) => o.classList.toggle('active', i === active));
+                opts[active]?.scrollIntoView({ block: 'nearest' });
+            }
+            else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                active = Math.max(active - 1, 0);
+                opts.forEach((o, i) => o.classList.toggle('active', i === active));
+                opts[active]?.scrollIntoView({ block: 'nearest' });
+            }
+            else if (e.key === "Enter") {
+                if (active >= 0 && opts[active]) {
+                    e.preventDefault();
+                    opts[active].click();
+                }
+            }
+            else if (e.key === "Escape") {
+                suggestions.innerHTML = "";
+                active = -1;
+            }
+        });
+        suggestions.addEventListener("click", (ev) => {
+            const el = ev.target.closest('.station-suggestion');
+            if (!el)
+                return;
+            const code = el.dataset.code;
+            const hidden = document.querySelector(`#${target}`);
+            hidden.value = code;
+            input.value = stationLabel(code);
+            suggestions.innerHTML = "";
+            input.focus();
+        });
+        // close suggestions when clicking outside
+        document.addEventListener('click', (ev) => { if (!input.contains(ev.target) && !suggestions.contains(ev.target))
+            suggestions.innerHTML = ""; });
     });
-    document.querySelector("#search-form")?.addEventListener("submit", async (e) => {
+    // removed <select> change handler; hidden inputs updated when suggestion chosen
+    document.querySelector("#swap")?.addEventListener("click", () => {
+        const fromHidden = document.querySelector('#from');
+        const toHidden = document.querySelector('#to');
+        const fromInput = document.querySelector('input[data-target="from"]');
+        const toInput = document.querySelector('input[data-target="to"]');
+        const a = fromHidden.value;
+        const b = toHidden.value;
+        fromHidden.value = b;
+        toHidden.value = a;
+        fromInput.value = stationLabel(fromHidden.value);
+        toInput.value = stationLabel(toHidden.value);
+        render();
+    });
+    document.querySelector("#prev-month")?.addEventListener("click", () => { calendarOffset = Math.max(0, calendarOffset - 1); render(); });
+    document.querySelector("#next-month")?.addEventListener("click", () => { calendarOffset = Math.min(2, calendarOffset + 1); render(); });
+    document.querySelectorAll("[data-date]").forEach((button) => button.addEventListener("click", () => { if (button.dataset.date) {
+        if (lastQuery)
+            lastQuery.date = button.dataset.date;
+        const hidden = document.querySelector('input[name="date"]');
+        if (hidden)
+            hidden.value = button.dataset.date;
+        render();
+    } }));
+    document.querySelectorAll("[data-edit-search], #modify-search").forEach((button) => button.addEventListener("click", () => {
+        const key = button.dataset.editSearch;
+        const target = key === "from" ? "#from" : key === "to" ? "#to" : key === "class" ? 'select[name="classCode"]' : key === "quota" ? 'select[name="quota"]' : key === "passengers" ? 'input[name="passengers"]' : ".calendar";
+        document.querySelector(".search-band")?.scrollIntoView({ block: "start" });
+        document.querySelector(target)?.focus();
+    }));
+    document.querySelector("#search-form")?.addEventListener("submit", (e) => {
         e.preventDefault();
         const query = readQuery(e.target);
+        if (query.from === query.to) {
+            message = "Choose different stations for your journey.";
+            render();
+            return;
+        }
         const dateError = validateBookingDate(query.date);
         if (dateError) {
             message = dateError;
             render();
             return;
         }
-        loading = "Checking available trains for your route... Comparing direct and connecting journeys...";
-        message = "";
+        void performSearch(query);
+    });
+}
+async function performSearch(query) {
+    loading = "Searching railway routes... Checking direct trains... Checking connecting routes... Preparing availability...";
+    message = "";
+    detailJourney = undefined;
+    page = 1;
+    render();
+    try {
+        lastQuery = query;
+        results = await search(query);
+        message = results.length ? "" : "No trains found for this combination.";
+        loading = "";
         render();
-        try {
-            lastQuery = query;
-            results = await search(query);
-            message = results.length ? "" : "No trains found for this combination.";
-            loading = "";
-            render();
-        }
-        catch (err) {
-            loading = "";
-            message = err instanceof Error ? err.message : "We could not complete the search. Please review your journey details.";
-            render();
-        }
+    }
+    catch (err) {
+        loading = "";
+        message = err instanceof Error ? err.message : "We could not complete the search. Please review your journey details.";
+        render();
+    }
+}
+function resultsShell() {
+    if (!lastQuery && !loading && !message && !results.length)
+        return "";
+    return `<section class="results-layout">${results.length ? filtersView() : ""}<div class="results-main">${resultsView()}</div></section>`;
+}
+function filtersView() {
+    return `<aside class="filters" aria-label="Search result filters"><h2>Filters</h2>
+    <label>Journey type<select id="filter-kind">${option("all", "All", filters.journeyType === "all")}${option("direct", "Direct", filters.journeyType === "direct")}${option("connecting", "Connecting", filters.journeyType === "connecting")}</select></label>
+    <label>Departure<select id="filter-depart">${["all", "early", "morning", "afternoon", "evening", "night"].map((v) => option(v, v, filters.departure === v)).join("")}</select></label>
+    <label>Arrival<select id="filter-arrive">${["all", "early", "morning", "afternoon", "evening", "night"].map((v) => option(v, v, filters.arrival === v)).join("")}</select></label>
+    <label>Availability<select id="filter-avail">${["all", "AVAILABLE", "RAC", "WL", "NOT_AVAILABLE"].map((v) => option(v, v === "WL" ? "Waitlist" : v, filters.availability === v)).join("")}</select></label>
+    <label>Class<select id="filter-class">${["all", "1A", "2A", "3A", "SL", "CC", "EC", "2S"].map((v) => option(v, classLabel(v), filters.classCode === v)).join("")}</select></label>
+    <label>Quota<select id="filter-quota">${["all", "GN", "TQ", "PT", "LD", "SS"].map((v) => option(v, quotaLabel(v), filters.quota === v)).join("")}</select></label>
+    <label>Max duration<input id="filter-duration" type="range" min="2" max="72" value="${Math.round(filters.maxDuration / 60)}"/><small>${Math.round(filters.maxDuration / 60)} hours</small></label>
+    <label>Max fare<input id="filter-fare" type="range" min="500" max="12000" step="500" value="${filters.maxFare}"/><small>₹${filters.maxFare}</small></label>
+    <label>Via station<input id="filter-via" placeholder="Station or code" value="${filters.via}"/></label>
+  </aside>`;
+}
+function filteredResults() {
+    return results.filter((r) => {
+        const first = r.legs[0].train;
+        const last = r.legs[r.legs.length - 1].train;
+        const via = r.legs.slice(0, -1).map((leg) => `${leg.to.name} ${leg.to.code} ${leg.to.city}`.toLowerCase()).join(" ");
+        if (filters.journeyType !== "all" && r.kind !== filters.journeyType)
+            return false;
+        if (filters.departure !== "all" && timeBucket(first.depart) !== filters.departure)
+            return false;
+        if (filters.arrival !== "all" && timeBucket(last.arrive) !== filters.arrival)
+            return false;
+        if (filters.availability !== "all" && r.availability !== filters.availability)
+            return false;
+        if (filters.classCode !== "all" && !r.legs.every((leg) => leg.train.classes.some((c) => c.classCode === filters.classCode)))
+            return false;
+        if (filters.quota !== "all" && lastQuery?.quota !== filters.quota)
+            return false;
+        if (r.durationMins > filters.maxDuration || r.totalFare > filters.maxFare)
+            return false;
+        if (filters.via.trim() && !via.includes(filters.via.trim().toLowerCase()))
+            return false;
+        return true;
+    });
+}
+function sortedResults(rows) {
+    return [...rows].sort((a, b) => {
+        if (sortBy === "depart")
+            return a.legs[0].train.depart.localeCompare(b.legs[0].train.depart);
+        if (sortBy === "arrive")
+            return a.legs.at(-1).train.arrive.localeCompare(b.legs.at(-1).train.arrive);
+        if (sortBy === "duration")
+            return a.durationMins - b.durationMins;
+        if (sortBy === "fare")
+            return a.totalFare - b.totalFare;
+        if (sortBy === "availability")
+            return availabilityScore(b.availability) - availabilityScore(a.availability);
+        return (a.kind === "direct" ? 0 : 1) - (b.kind === "direct" ? 0 : 1) || availabilityScore(b.availability) - availabilityScore(a.availability) || a.durationMins - b.durationMins || a.totalFare - b.totalFare;
     });
 }
 function resultsView() {
     if (loading)
         return `<section class="panel" aria-live="polite"><h2>Searching</h2><p>${loading}</p></section>`;
     if (message && !activeAttempt)
-        return `<section class="panel error-state" role="alert"><h2>${message}</h2><div class="actions"><button id="prev-day">Try previous day</button><button id="next-day">Try next day</button><button id="flex-search">Search nearby dates</button><button id="other-station">Try another station</button><button id="nearby">Show nearby stations</button></div></section>`;
+        return `<section class="panel error-state" role="alert"><h2>${message}</h2><div class="actions"><button id="prev-day">Try previous date</button><button id="next-day">Try next date</button><button id="flex-search">Search nearby dates</button><button id="nearby">Try nearby stations</button><button id="change-class">Change class</button><button id="show-connections">Show connecting journeys</button></div></section>`;
     if (!results.length)
         return "";
+    const visible = sortedResults(filteredResults());
+    const perPage = getState().resultsPerPage;
+    const totalPages = Math.max(1, Math.ceil(visible.length / perPage));
+    page = Math.min(page, totalPages);
+    const start = (page - 1) * perPage;
+    const rows = visible.slice(start, start + perPage);
     const hasDirect = results.some((r) => r.kind === "direct");
-    return html `
-    <section class="results">
-      <h2>${hasDirect ? "Available trains" : "No direct trains found. Here are connecting journeys you can book."}</h2>
-      ${groupResults(results).map(([date, rows]) => `<div class="date-group"><h3>${date}</h3>${rows.map(resultCard).join("")}</div>`).join("")}
-    </section>`;
-}
-function groupResults(rows) {
-    const grouped = new Map();
-    for (const row of rows)
-        grouped.set(row.date, [...(grouped.get(row.date) || []), row]);
-    return [...grouped.entries()];
+    return `<section class="results"><h2>${hasDirect ? "Direct trains first, with connecting alternatives" : "No direct train found. Here are connecting journeys that can get you there."}</h2><div class="result-toolbar"><span>Showing ${visible.length ? start + 1 : 0}-${Math.min(start + perPage, visible.length)} of ${visible.length} trains</span><label>Sort by<select id="sort">${["recommended", "depart", "arrive", "duration", "fare", "availability"].map((s) => option(s, s === "depart" ? "Departure time" : s === "arrive" ? "Arrival time" : s === "fare" ? "Lowest fare" : s === "availability" ? "Highest availability" : "Recommended", sortBy === s)).join("")}</select></label><label>Results per page<select id="per-page">${[25, 50, 100].map((n) => option(String(n), String(n), getState().resultsPerPage === n)).join("")}</select></label><label>View<select id="density">${option("comfortable", "3 columns", getState().gridDensity === "comfortable")}${option("compact", "4 columns", getState().gridDensity === "compact")}</select></label></div><div class="result-grid ${getState().gridDensity}">${rows.map(resultCard).join("")}</div><div class="pagination"><button id="page-prev" ${page === 1 ? "disabled" : ""}>Previous</button><span>Page ${page} of ${totalPages}</span><button id="page-next" ${page === totalPages ? "disabled" : ""}>Next</button></div></section>`;
 }
 function resultCard(result) {
-    const legs = result.legs.map((leg) => `<li><strong>${leg.train.number} ${leg.train.name}</strong><span>${leg.from.name} → ${leg.to.name}</span><span>${leg.train.depart} → ${leg.train.arrive}</span></li>`).join("");
-    return html `
-    <article class="result-card ${result.kind}">
-      <div><strong>${result.kind === "direct" ? "Direct journey" : "Connecting journey"}</strong><p>${result.legs.length} leg${result.legs.length > 1 ? "s" : ""}${result.transferMins ? ` • ${mins(result.transferMins)} transfer` : ""}</p></div>
-      <ul class="legs">${legs}</ul>
-      <dl><div><dt>Duration</dt><dd>${mins(result.durationMins)}</dd></div><div><dt>Availability</dt><dd>${result.availability}</dd></div><div><dt>Fare</dt><dd>₹${result.totalFare}</dd></div></dl>
-      <button data-book="${result.id}">Review before payment</button>
-    </article>`;
+    const first = result.legs[0];
+    const last = result.legs[result.legs.length - 1];
+    const classInfo = first.train.classes.find((c) => c.classCode === lastQuery?.classCode) || first.train.classes[0];
+    const routeText = result.kind === "direct" ? `${first.from.code} → ${last.to.code}` : `${first.from.code} → ${first.to.code} → ${last.to.code}`;
+    return `<article class="result-card ${result.kind}"><div class="train-kicker">${first.train.number}</div><h3>${first.train.name}</h3><div class="card-route"><strong>${routeText}</strong><span>${first.train.depart} → ${last.train.arrive}</span></div><p>${mins(result.durationMins)} • ${result.kind === "direct" ? "Direct" : `${result.legs.length} trains, ${result.legs.length - 1} transfer`}</p>${result.kind === "connecting" ? `<p class="transfer">Transfer at ${first.to.name} • wait ${mins(result.transferMins || 0)}</p>` : ""}<dl><div><dt>Class</dt><dd>${classInfo.classCode}</dd></div><div><dt>Availability</dt><dd>${result.availability}${classInfo.seats ? ` ${classInfo.seats} seats` : ""}</dd></div><div><dt>Fare</dt><dd>₹${result.totalFare}</dd></div></dl><button data-detail="${result.id}">View journey</button></article>`;
+}
+function detailView(result) {
+    const legs = result.legs.map((leg, index) => `<li><strong>${leg.train.number} ${leg.train.name}</strong><span>${leg.from.name} (${leg.from.code}) ${leg.train.depart} → ${leg.to.name} (${leg.to.code}) ${leg.train.arrive}</span><span>${mins(leg.train.durationMins)} • runs ${leg.train.days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ")} • ${leg.train.classes.map((c) => `${c.classCode} ₹${c.fare} ${c.availability}`).join(" | ")}</span>${index === 0 && result.transferMins ? `<em>Transfer wait: ${mins(result.transferMins)}</em>` : ""}</li>`).join("");
+    return `<section class="panel journey-detail"><button id="back-results">Back to results</button><h2>${result.kind === "direct" ? "Direct journey details" : "Connecting journey details"}</h2><ul class="legs detail">${legs}</ul><p><strong>Total:</strong> ${mins(result.durationMins)} • ${result.availability} • ₹${result.totalFare} • ${lastQuery ? quotaLabel(lastQuery.quota) : ""}</p><button data-book="${result.id}">Continue to passenger details</button></section>`;
 }
 function statusPanel() {
     if (!activeAttempt)
         return "";
     const meaning = bookingMeaning(activeAttempt.state);
     const leg = activeAttempt.journey.legs[0];
-    return html `
-    <section class="status ${meaning.citizenState.toLowerCase().replace(/\s+/g, "-")}" aria-live="polite">
-      <h2>${meaning.citizenState}</h2>
-      ${duplicateNotice ? `<div class="warning"><strong>You already have a booking attempt for this journey.</strong><br/>${duplicateNotice}</div>` : ""}
-      <p><strong>${meaning.next}</strong></p>
-      <div class="four-part"><p>${meaning.money}</p><p>${meaning.ticket}</p></div>
-      ${activeAttempt.state === "BOOKING_UNKNOWN" ? `<div class="warning">DO NOT PAY AGAIN</div>` : ""}
-      <div class="actions">
-        ${(activeAttempt.state === "BOOKING_UNKNOWN" || activeAttempt.state === "REFUND_PENDING") ? `<button id="check-status">Check booking status</button>` : ""}
-        ${activeAttempt.state === "BOOKED" ? `<button id="view-ticket">View ticket</button><button id="download-ticket">Download ticket</button><button id="add-trip">Add to trips</button><button id="pnr-status">Check PNR status</button>` : ""}
-        ${activeAttempt.retryAllowed ? `<button id="safe-retry">Safe to try another booking</button>` : ""}
-      </div>
-      <details open><summary>Booking timeline</summary>${activeAttempt.timeline.map((item) => `<p><time>${item.time}</time> ${item.label}</p>`).join("")}</details>
-      <p class="muted">Attempt ${activeAttempt.id} • ${leg.train.name} • ${activeAttempt.query.date}</p>
-    </section>`;
+    return `<section class="status ${meaning.citizenState.toLowerCase().replace(/\s+/g, "-")}" aria-live="polite"><h2>${meaning.citizenState}</h2>${duplicateNotice ? `<div class="warning"><strong>You already have a booking attempt for this journey.</strong><br/>${duplicateNotice}</div>` : ""}<p><strong>${meaning.next}</strong></p><div class="four-part"><p>${meaning.money}</p><p>${meaning.ticket}</p></div>${activeAttempt.state === "BOOKING_UNKNOWN" ? `<div class="warning">DO NOT PAY AGAIN</div>` : ""}<div class="actions">${(activeAttempt.state === "BOOKING_UNKNOWN" || activeAttempt.state === "REFUND_PENDING") ? `<button id="check-status">Check booking status</button>` : ""}${activeAttempt.state === "BOOKED" ? `<button id="view-ticket">View ticket</button><button id="download-ticket">Download ticket</button><button id="add-trip">Add to trips</button><button id="pnr-status">Check PNR status</button>` : ""}${activeAttempt.retryAllowed ? `<button id="safe-retry">Safe to try another booking</button>` : ""}</div><details open><summary>Booking timeline</summary>${activeAttempt.timeline.map((item) => `<p><time>${item.time}</time> ${item.label}</p>`).join("")}</details><p class="muted">Attempt ${activeAttempt.id} • ${leg.train.name} • ${activeAttempt.query.date}</p></section>`;
 }
 function wireGlobal() {
+    document.querySelectorAll("[data-detail]").forEach((button) => button.addEventListener("click", () => { detailJourney = results.find((item) => item.id === button.dataset.detail); render(); }));
+    document.querySelector("#back-results")?.addEventListener("click", () => { detailJourney = undefined; render(); });
     document.querySelectorAll("[data-book]").forEach((button) => button.addEventListener("click", async () => {
         const journey = results.find((item) => item.id === button.dataset.book);
         if (!journey || !lastQuery)
@@ -243,6 +383,7 @@ function wireGlobal() {
         if (duplicate) {
             activeAttempt = duplicate;
             duplicateNotice = `Payment status: ${bookingMeaning(duplicate.state).money} Booking status: ${duplicate.state}. Attempt ID: ${duplicate.id}. We recommend checking the previous booking before paying again.`;
+            detailJourney = undefined;
             render();
             return;
         }
@@ -251,42 +392,44 @@ function wireGlobal() {
         render();
         activeAttempt = await startBooking(journey, lastQuery);
         loading = "";
+        detailJourney = undefined;
         render();
     }));
-    document.querySelector("#check-status")?.addEventListener("click", async () => {
-        if (!activeAttempt)
-            return;
-        loading = "Payment received. Checking whether the railway reservation was created...";
-        render();
-        activeAttempt = await checkBookingStatus(activeAttempt.id);
-        loading = "";
-        render();
-    });
+    document.querySelector("#check-status")?.addEventListener("click", async () => { if (!activeAttempt)
+        return; loading = "Payment received. Checking whether the railway reservation was created..."; render(); activeAttempt = await checkBookingStatus(activeAttempt.id); loading = ""; render(); });
     document.querySelector("#view-ticket")?.addEventListener("click", () => { route = "/pnr"; location.hash = route; });
     document.querySelector("#download-ticket")?.addEventListener("click", () => alert("Prototype ticket downloaded as a text receipt."));
     document.querySelector("#add-trip")?.addEventListener("click", () => alert("Trip is saved in My Trips."));
     document.querySelector("#pnr-status")?.addEventListener("click", () => { route = "/pnr"; location.hash = route; });
     document.querySelector("#safe-retry")?.addEventListener("click", () => { activeAttempt = undefined; render(); });
-    document.querySelectorAll("[data-trip-filter]").forEach((button) => button.addEventListener("click", () => {
-        tripsFilter = button.dataset.tripFilter;
-        render();
-    }));
-    document.querySelector("#prev-day")?.addEventListener("click", () => shiftDate(-1));
-    document.querySelector("#next-day")?.addEventListener("click", () => shiftDate(1));
-    document.querySelector("#flex-search")?.addEventListener("click", () => { if (lastQuery) {
-        lastQuery.flexible = true;
-        render();
-    } });
-    document.querySelector("#other-station")?.addEventListener("click", () => document.querySelector(".station-search")?.focus());
-    document.querySelector("#nearby")?.addEventListener("click", () => alert("Nearby stations are shown in station search suggestions for the selected city."));
+    document.querySelectorAll("[data-trip-filter]").forEach((button) => button.addEventListener("click", () => { tripsFilter = button.dataset.tripFilter; render(); }));
+    document.querySelector("#prev-day")?.addEventListener("click", () => shiftAndSearch(-1));
+    document.querySelector("#next-day")?.addEventListener("click", () => shiftAndSearch(1));
+    document.querySelector("#flex-search")?.addEventListener("click", () => { if (lastQuery)
+        void performSearch({ ...lastQuery, flexible: true }); });
+    document.querySelector("#nearby")?.addEventListener("click", () => { if (lastQuery)
+        void performSearch({ ...lastQuery, to: "NDLS" }); });
+    document.querySelector("#change-class")?.addEventListener("click", () => { if (lastQuery)
+        void performSearch({ ...lastQuery, classCode: lastQuery.classCode === "3A" ? "SL" : "3A" }); });
+    document.querySelector("#show-connections")?.addEventListener("click", () => { filters = { ...filters, journeyType: "connecting" }; render(); });
+    document.querySelector("#sort")?.addEventListener("change", (e) => { sortBy = e.target.value; page = 1; render(); });
+    document.querySelector("#per-page")?.addEventListener("change", (e) => { setState({ resultsPerPage: Number(e.target.value) }); page = 1; });
+    document.querySelector("#density")?.addEventListener("change", (e) => setState({ gridDensity: e.target.value }));
+    document.querySelector("#page-prev")?.addEventListener("click", () => { page = Math.max(1, page - 1); render(); });
+    document.querySelector("#page-next")?.addEventListener("click", () => { page += 1; render(); });
+    [["#filter-kind", "journeyType"], ["#filter-depart", "departure"], ["#filter-arrive", "arrival"], ["#filter-avail", "availability"], ["#filter-class", "classCode"], ["#filter-quota", "quota"]].forEach(([selector, key]) => document.querySelector(selector)?.addEventListener("change", (e) => { filters = { ...filters, [key]: e.target.value }; page = 1; render(); }));
+    document.querySelector("#filter-duration")?.addEventListener("input", (e) => { filters = { ...filters, maxDuration: Number(e.target.value) * 60 }; page = 1; render(); });
+    document.querySelector("#filter-fare")?.addEventListener("input", (e) => { filters = { ...filters, maxFare: Number(e.target.value) }; page = 1; render(); });
+    document.querySelector("#filter-via")?.addEventListener("input", (e) => { filters = { ...filters, via: e.target.value }; page = 1; render(); });
 }
-function shiftDate(days) {
+function shiftAndSearch(days) {
     if (!lastQuery)
         return;
     const d = new Date(`${lastQuery.date}T00:00:00`);
     d.setDate(d.getDate() + days);
-    lastQuery.date = d.toISOString().slice(0, 10);
-    render();
+    const query = { ...lastQuery, date: d.toISOString().slice(0, 10) };
+    if (!validateBookingDate(query.date))
+        void performSearch(query);
 }
 function tripsView() {
     const saved = getState().trips;
@@ -327,6 +470,8 @@ function render() {
         bookView();
     wireGlobal();
 }
+// start India time when app loads
+startIndiaTime();
 window.addEventListener("hashchange", () => { route = location.hash.replace("#", "") || "/book"; message = ""; render(); });
 subscribe(render);
 render();

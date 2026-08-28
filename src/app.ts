@@ -69,13 +69,12 @@ function layout(content: string) {
 
 // Update top-time element with India time every second
 function startIndiaTime() {
-  const el = document.getElementById('top-time');
-  if (!el) return;
+  // Always schedule updates; the element may be created later during render.
   function update() {
     const now = new Date();
-    // convert to IST (UTC+5:30)
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     const ist = new Date(utc + (5.5 * 60 * 60 * 1000));
+    const el = document.getElementById('top-time');
     if (el) el.textContent = ist.toLocaleString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', year: 'numeric' });
   }
   update();

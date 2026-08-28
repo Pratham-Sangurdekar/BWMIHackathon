@@ -59,7 +59,26 @@ function layout(content: string) {
       <a class="brand" href="#/book"><img class="brand-logo" src="/image.png" alt="RailVishwas logo"/><span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span></a>
       <nav aria-label="Primary">
         <a class="${route === "/book" ? "active" : ""}" href="#/book">${label("book")}</a>
-        <a class="${route === "/trains" || route.startsWith("/trains") ? "active" : ""}" href="#/trains">TRAINS</a>
+        <div class="dropdown-parent ${route === "/trains" || route.startsWith("/trains") ? "active" : ""}">
+          <a href="#/trains">TRAINS</a>
+          <div class="dropdown" role="menu">
+            <a role="menuitem" href="#/trains/book">Book Ticket</a>
+            <a role="menuitem" href="#/trains/foreign">Foreign Tourist Booking</a>
+            <a role="menuitem" href="#/trains/connecting">Connecting Journey Booking</a>
+            <a role="menuitem" href="#/trains/irctc">IRCTC TRAINS</a>
+            <a role="menuitem" href="#/trains/cancel">Cancel E-Ticket</a>
+            <a role="menuitem" href="#/pnr">PNR Enquiry</a>
+            <a role="menuitem" href="#/trains/schedule">Train Schedule</a>
+            <a role="menuitem" href="#/trains/track">Track Your Train</a>
+            <a role="menuitem" href="#/trains/ftr">FTR Coach/Train Booking</a>
+            <a role="menuitem" href="#/trains/luggage">Luggage Booking</a>
+            <a role="menuitem" href="#/trains/pets">Dogs/Cats Booking</a>
+            <a role="menuitem" href="#/trains/link-aadhaar">Link Your Aadhaar</a>
+            <a role="menuitem" href="#/trains/counter-cancel">Counter Ticket Cancellation</a>
+            <a role="menuitem" href="#/trains/counter-change">Counter Ticket Boarding Point Change</a>
+            <a role="menuitem" href="#/trains/apps">IRCTC Official Mobile Apps</a>
+          </div>
+        </div>
         <a class="${route === "/trips" ? "active" : ""}" href="#/trips">${label("trips")}</a>
         <a class="${route === "/pnr" ? "active" : ""}" href="#/pnr">${label("pnr")}</a>
         <a class="${route === "/help" ? "active" : ""}" href="#/help">${label("help")}</a>
@@ -426,6 +445,33 @@ function trainsView() {
   document.querySelector("#pnr-enquiry")?.addEventListener("click", () => { route = "/pnr"; location.hash = route; });
 }
 
+function bookTicketView() {
+  layout(`<section class="panel"><h1>Book Ticket</h1><p>This opens the standard booking flow.</p><a href="#/book">Open booking</a></section>`);
+}
+
+function foreignTouristView() {
+  layout(`<section class="panel"><h1>Foreign Tourist Booking</h1><p>Special booking path for foreign tourists (prototype).</p></section>`);
+}
+
+function connectingJourneyView() {
+  layout(`<section class="panel"><h1>Connecting Journey Booking</h1><p>Search connecting journeys and book links.</p></section>`);
+}
+
+function irctcTrainsView() {
+  layout(`<section class="panel"><h1>IRCTC Trains</h1><p>IRCTC trains and special info.</p></section>`);
+}
+
+function cancelTicketView() { layout(`<section class="panel"><h1>Cancel E-Ticket</h1><p>Enter PNR to cancel an e-ticket (prototype).</p></section>`); }
+function trainScheduleView() { layout(`<section class="panel"><h1>Train Schedule</h1><p>Search train schedule by number or route.</p></section>`); }
+function trackTrainView() { layout(`<section class="panel"><h1>Track Your Train</h1><p>Enter train number to view live movement.</p></section>`); }
+function ftrBookingView() { layout(`<section class="panel"><h1>FTR Coach/Train Booking</h1><p>Prototype for FTR bookings.</p></section>`); }
+function luggageBookingView() { layout(`<section class="panel"><h1>Luggage Booking</h1><p>Book parcel and luggage services.</p></section>`); }
+function petsBookingView() { layout(`<section class="panel"><h1>Dogs/Cats Booking</h1><p>Pet travel booking options.</p></section>`); }
+function linkAadhaarView() { layout(`<section class="panel"><h1>Link Your Aadhaar</h1><p>Link Aadhaar to your profile (simulated).</p></section>`); }
+function counterCancelView() { layout(`<section class="panel"><h1>Counter Ticket Cancellation</h1><p>Counter cancellation info and form.</p></section>`); }
+function counterChangeView() { layout(`<section class="panel"><h1>Counter Ticket Boarding Point Change</h1><p>Change boarding point at counter (prototype).</p></section>`); }
+function irctcAppsView() { layout(`<section class="panel"><h1>IRCTC Official Mobile Apps</h1><p>Links to official apps (prototype).</p></section>`); }
+
 function liveTrainView() {
   layout(`<section class="panel narrow"><h1>Live Train</h1><form id="live-form" class="form"><label>Train number<input name="number" /></label><button type="submit">Lookup live position</button></form><div id="live-result"></div></section>`);
   document.querySelector<HTMLFormElement>("#live-form")?.addEventListener("submit", (e) => {
@@ -462,6 +508,20 @@ function render() {
   else if (route === "/trains") trainsView();
   else if (route === "/trains/live") liveTrainView();
   else if (route === "/trains/status") trainStatusView();
+  else if (route === "/trains/book") bookTicketView();
+  else if (route === "/trains/foreign") foreignTouristView();
+  else if (route === "/trains/connecting") connectingJourneyView();
+  else if (route === "/trains/irctc") irctcTrainsView();
+  else if (route === "/trains/cancel") cancelTicketView();
+  else if (route === "/trains/schedule") trainScheduleView();
+  else if (route === "/trains/track") trackTrainView();
+  else if (route === "/trains/ftr") ftrBookingView();
+  else if (route === "/trains/luggage") luggageBookingView();
+  else if (route === "/trains/pets") petsBookingView();
+  else if (route === "/trains/link-aadhaar") linkAadhaarView();
+  else if (route === "/trains/counter-cancel") counterCancelView();
+  else if (route === "/trains/counter-change") counterChangeView();
+  else if (route === "/trains/apps") irctcAppsView();
   else bookView();
   wireGlobal();
 }

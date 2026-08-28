@@ -93,6 +93,37 @@ function layout(content: string) {
   document.querySelector<HTMLSelectElement>("#language-control")?.addEventListener("change", (e) => setState({ language: (e.target as HTMLSelectElement).value as Language }));
 }
 
+// Initialize dropdown toggle behavior once per page lifecycle to avoid duplicate listeners
+function initTrainsDropdown() {
+  const parent = document.querySelector<HTMLDivElement>(".dropdown-parent");
+  if (!parent) return;
+  if ((parent as any).dataset.dropdownInit) return;
+  (parent as any).dataset.dropdownInit = "1";
+  const toggle = parent.querySelector<HTMLAnchorElement>(":scope > a");
+  if (toggle) {
+    toggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      parent.classList.toggle("open");
+      const expanded = parent.classList.contains("open");
+      toggle.setAttribute("aria-expanded", String(expanded));
+    });
+    // ensure ARIA attribute exists
+    toggle.setAttribute("aria-haspopup", "true");
+    toggle.setAttribute("aria-expanded", "false");
+  }
+  // Close when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!parent.classList.contains("open")) return;
+    if (parent.contains(e.target as Node)) return;
+    parent.classList.remove("open");
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+  });
+  // Close on Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { parent.classList.remove("open"); if (toggle) toggle.setAttribute("aria-expanded", "false"); }
+  });
+}
+
 // Update top-time element with India time every second
 function startIndiaTime() {
   // Always schedule updates; the element may be created later during render.
@@ -374,6 +405,8 @@ function wireGlobal() {
   document.querySelector("#filter-duration")?.addEventListener("input", (e) => { filters = { ...filters, maxDuration: Number((e.target as HTMLInputElement).value) * 60 }; page = 1; render(); });
   document.querySelector("#filter-fare")?.addEventListener("input", (e) => { filters = { ...filters, maxFare: Number((e.target as HTMLInputElement).value) }; page = 1; render(); });
   document.querySelector("#filter-via")?.addEventListener("input", (e) => { filters = { ...filters, via: (e.target as HTMLInputElement).value }; page = 1; render(); });
+  // initialize trains dropdown behaviour (one-time)
+  initTrainsDropdown();
 }
 
 function shiftAndSearch(days: number) {

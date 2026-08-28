@@ -105,6 +105,9 @@ body.signin-bg::before {
 .search-form .check { display: flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px; }
 .search-form .check input { width: 20px; min-height: 20px; }
 .conditional { display: block; }
+
+/* Highlight demo scenario label in booking form */
+.demo-scenario { color: var(--red); font-size: 1.02rem; font-weight: 900; }
 .icon-button { align-self: center; background: var(--blue); padding: 0; width: 48px; }
 .rule { color: var(--muted); font-size: 0.92rem; margin-bottom: 0; }
 .error, .error-state h2 { color: var(--red); }

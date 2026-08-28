@@ -198,7 +198,7 @@ function bookView() {
         <label>Mock disability ID<input name="disabilityId" value="${lastQuery?.disabilityId || ""}" /></label>
         <label class="check"><input name="railPass" type="checkbox" ${lastQuery?.railPass ? "checked" : ""}/> Railway pass concession</label>
         <label>Mock pass number<input name="passNumber" value="${lastQuery?.passNumber || ""}" /></label>
-        <label>DEMO SCENARIO<select name="scenario">${option("normal","Normal successful booking", lastQuery?.scenario === "normal" || !lastQuery)}${option("unknownBooked","Payment success → unknown → booked", lastQuery?.scenario === "unknownBooked")}${option("unknownNotBooked","Payment success → unknown → refund", lastQuery?.scenario === "unknownNotBooked")}${option("paymentFailed","Payment failed → safe retry", lastQuery?.scenario === "paymentFailed")}</select></label>
+        <label class="demo-scenario">DEMO SCENARIO<select name="scenario">${option("normal","Normal successful booking", lastQuery?.scenario === "normal" || !lastQuery)}${option("unknownBooked","Payment success → unknown → booked", lastQuery?.scenario === "unknownBooked")}${option("unknownNotBooked","Payment success → unknown → refund", lastQuery?.scenario === "unknownNotBooked")}${option("paymentFailed","Payment failed → safe retry", lastQuery?.scenario === "paymentFailed")}</select></label>
         <p id="search-error" class="error" role="alert">${message && !results.length ? message : ""}</p>
         <button type="submit">Search trains</button>
       </form>

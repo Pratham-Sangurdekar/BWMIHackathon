@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist && cp index.html dist/index.html && cp -R src dist/src || true && cp -n image.png vande-bharat-red-gray.jpg dist/ 2>/dev/null || true",
     "dev": "node server.mjs",
     "start": "node server.mjs"
   },

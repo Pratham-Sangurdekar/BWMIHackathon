@@ -386,6 +386,9 @@ function accountView() {
 function render() {
   if (!getState().language) return languageGate();
   requireAuth();
+  // Toggle sign-in background class based on route
+  if (route === "/account") document.body.classList.add("signin-bg");
+  else document.body.classList.remove("signin-bg");
   if (route === "/trips") tripsView();
   else if (route === "/pnr") pnrView();
   else if (route === "/help") helpView();

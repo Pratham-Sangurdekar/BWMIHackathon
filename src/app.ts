@@ -4,6 +4,15 @@ import { getState, setState, subscribe } from "./store.js";
 import type { Availability, BookingAttempt, JourneyResult, Language, Quota, ResultFilters, Scenario, SearchQuery, Station, TrainClass } from "./types.js";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
+
+// Ensure a persistent top-time element exists outside render cycles to avoid flicker
+let topTimeEl = document.getElementById("top-time") as HTMLDivElement | null;
+if (!topTimeEl) {
+  topTimeEl = document.createElement("div");
+  topTimeEl.id = "top-time";
+  topTimeEl.className = "top-time";
+  document.body.appendChild(topTimeEl);
+}
 let route = location.hash.replace("#", "") || "/book";
 let results: JourneyResult[] = [];
 let activeAttempt: BookingAttempt | undefined;
@@ -46,11 +55,11 @@ function layout(content: string) {
   const state = getState();
   app.className = state.liteMode ? "lite app-shell" : "app-shell";
   app.innerHTML = html`
-    <div class="top-time" id="top-time"></div>
     <header class="topbar">
       <a class="brand" href="#/book"><img class="brand-logo" src="/image.png" alt="RailVishwas logo"/><span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span></a>
       <nav aria-label="Primary">
         <a class="${route === "/book" ? "active" : ""}" href="#/book">${label("book")}</a>
+        <a class="${route === "/trains" || route.startsWith("/trains") ? "active" : ""}" href="#/trains">TRAINS</a>
         <a class="${route === "/trips" ? "active" : ""}" href="#/trips">${label("trips")}</a>
         <a class="${route === "/pnr" ? "active" : ""}" href="#/pnr">${label("pnr")}</a>
         <a class="${route === "/help" ? "active" : ""}" href="#/help">${label("help")}</a>
@@ -72,8 +81,10 @@ function startIndiaTime() {
     const now = new Date();
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     const ist = new Date(utc + (5.5 * 60 * 60 * 1000));
-    const el = document.getElementById('top-time');
-    if (el) el.textContent = ist.toLocaleString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', year: 'numeric' });
+    if (topTimeEl) {
+      // update text without forcing extra layout thrash
+      topTimeEl.textContent = ist.toLocaleString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', year: 'numeric' });
+    }
   }
   update();
   setInterval(update, 1000);
@@ -376,8 +387,36 @@ function helpView() {
 function accountView() {
   const user = getState().user;
   if (!user) return loginView();
-  layout(`<section class="panel narrow"><h1>Account</h1><p>Signed in as <strong>${user.name}</strong> (${user.email}).</p><button id="logout">${label("logout")}</button></section>`);
+  // Editable profile form
+  layout(`<section class="panel narrow"><h1>Update Profile</h1>
+    <div class="profile-block"><h3>My Profile</h3>
+      <form id="profile-form" class="form">
+        <label>Full name<input name="name" value="${user.name || ""}" /></label>
+        <label>Gender<input name="gender" value="${(user as any).gender || ""}" /></label>
+        <label>Date Of Birth<input name="dob" value="${(user as any).dob || ""}" /></label>
+        <label>ISD-Mobile<input name="mobile" value="${(user as any).mobile || ""}" /></label>
+        <label>Country<input name="country" value="${(user as any).country || "India"}" /></label>
+        <label>Email<input name="email" value="${user.email}" /></label>
+        <label>Residential Address<textarea name="residentialAddress">${(user as any).residentialAddress || ""}</textarea></label>
+        <div style="display:flex;gap:8px;"><button type="submit">Save profile</button><button type="button" id="logout">${label("logout")}</button></div>
+      </form>
+    </div>
+    <div class="panel"><h3>PASSWORDS</h3><p>Change Login Password</p><button id="change-password">Change</button></div>
+    <div class="panel"><h3>IRCTC e-Wallet</h3><p><button id="wallet">REGISTER/REACTIVATE</button></p></div>
+    <div class="panel"><h3>AADHAAR KYC</h3><p><span id="aadhaar-status">Not Verified</span> <button id="start-kyc">Start KYC</button></p></div>
+  </section>`);
+
+  document.querySelector<HTMLFormElement>("#profile-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const data = new FormData(e.target as HTMLFormElement);
+    const updated = { email: String(data.get("email") || user.email), name: String(data.get("name") || user.name), gender: String(data.get("gender") || ""), dob: String(data.get("dob") || ""), mobile: String(data.get("mobile") || ""), country: String(data.get("country") || ""), residentialAddress: String(data.get("residentialAddress") || "") };
+    setState({ user: updated });
+    message = "Profile saved"; render();
+  });
   document.querySelector("#logout")?.addEventListener("click", () => { setState({ user: undefined }); route = "/account"; location.hash = route; });
+  document.querySelector("#change-password")?.addEventListener("click", () => alert("Password change flow is a prototype."));
+  document.querySelector("#wallet")?.addEventListener("click", () => alert("e-Wallet registration simulated."));
+  document.querySelector("#start-kyc")?.addEventListener("click", () => { (document.querySelector("#aadhaar-status") as HTMLElement).textContent = "Verification in progress"; setTimeout(() => { (document.querySelector("#aadhaar-status") as HTMLElement).textContent = "Verified"; }, 1200); });
 }
 
 function render() {

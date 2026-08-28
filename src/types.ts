@@ -23,7 +23,7 @@ export interface ResultFilters {
   arrival: "all" | "early" | "morning" | "afternoon" | "evening" | "night"; availability: "all" | Availability;
   maxDuration: number; maxFare: number; via: string; classCode: TrainClass | "all"; quota: Quota | "all";
 }
-export interface User { email: string; name: string; }
+export interface User { email: string; name: string; gender?: string; dob?: string; mobile?: string; country?: string; residentialAddress?: string; }
 export interface TimelineEvent { time: string; label: string; }
 export interface BookingAttempt {
   id: string; journey: JourneyResult; query: SearchQuery; state: TxState; retryAllowed: boolean;

@@ -28,7 +28,7 @@ label { display: grid; gap: 6px; font-weight: 700; font-size: 0.88rem; }
 small, .muted { color: var(--muted); font-weight: 400; }
 .skip-link { position: absolute; left: -999px; top: 8px; background: white; padding: 8px; z-index: 10; }
 .skip-link:focus { left: 8px; }
-.topbar { display: flex; align-items: center; padding: 8px 28px; background: var(--navy); color: white; position: relative; }
+.topbar { display: flex; align-items: center; padding: 36px 28px 12px; background: var(--navy); color: white; position: relative; }
 .brand { display: flex; gap: 10px; align-items: center; color: white; text-decoration: none; flex: 0 0 auto; }
 .brand small { display: block; color: #dbe6f4; font-size: 0.78rem; margin-top: 2px; }
 .brand-logo { width: 56px; height: 40px; border-radius: 6px; object-fit: contain; background: white; padding: 4px; border: 2px solid rgba(255,255,255,0.12); }
@@ -44,6 +44,7 @@ nav a { color: white; text-decoration: none; padding: 8px 6px; border-radius: 2p
 main { padding: 22px; width: min(1480px, 100%); margin: 0 auto; flex: 1; }
 footer { padding: 16px 22px; color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); background: white; }
 .top-time { text-align: center; padding: 6px 12px; font-weight: 700; color: var(--muted); background: transparent; }
+.top-time { position: absolute; left: 50%; transform: translateX(-50%); top: 8px; padding: 6px 12px; font-weight: 700; color: white; background: transparent; z-index: 3; }
 
 /* Sign-in page background image (shown only when body has .signin-bg) */
 body.signin-bg::before {

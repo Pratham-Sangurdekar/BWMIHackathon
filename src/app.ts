@@ -48,7 +48,7 @@ function layout(content: string) {
   app.innerHTML = html`
     <div class="top-time" id="top-time"></div>
     <header class="topbar">
-      <a class="brand" href="#/book"><span class="rail-mark">RV</span><span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span></a>
+      <a class="brand" href="#/book"><img class="brand-logo" src="/image.png" alt="RailVishwas logo"/><span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span></a>
       <nav aria-label="Primary">
         <a class="${route === "/book" ? "active" : ""}" href="#/book">${label("book")}</a>
         <a class="${route === "/trips" ? "active" : ""}" href="#/trips">${label("trips")}</a>

@@ -31,7 +31,8 @@ small, .muted { color: var(--muted); font-weight: 400; }
 .topbar { display: flex; align-items: center; gap: 20px; padding: 12px 18px; background: var(--navy); color: white; flex-wrap: wrap; }
 .brand { display: flex; gap: 10px; align-items: center; color: white; text-decoration: none; min-width: 245px; }
 .brand small { display: block; color: #dbe6f4; font-size: 0.78rem; margin-top: 2px; }
-.rail-mark { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 2px solid currentColor; border-radius: 6px; font-weight: 800; }
+.brand-logo { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; background: white; padding: 4px; border: 2px solid rgba(255,255,255,0.12); }
+.rail-mark { display: none; }
 nav { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
 nav a { color: white; text-decoration: none; padding: 10px 12px; border-radius: 4px; }
 nav a.active, nav a:hover { background: rgba(255,255,255,0.14); }

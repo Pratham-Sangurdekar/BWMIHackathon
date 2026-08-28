@@ -58,13 +58,11 @@ function layout(content: string) {
       </nav>
       <div class="header-actions">
         <select id="language-control" aria-label="Change language">${option("en", "English", state.language === "en")}${option("hi", "हिन्दी", state.language === "hi")}</select>
-        <label class="toggle"><input id="lite" type="checkbox" ${state.liteMode ? "checked" : ""}/> Lite</label>
       </div>
     </header>
     <main id="main" tabindex="-1">${content}</main>
     <footer>Prototype — railway, payment and refund data are simulated. Do not enter real payment, OTP, Aadhaar, or IRCTC credentials.</footer>`;
   document.querySelector<HTMLSelectElement>("#language-control")?.addEventListener("change", (e) => setState({ language: (e.target as HTMLSelectElement).value as Language }));
-  document.querySelector<HTMLInputElement>("#lite")?.addEventListener("change", (e) => setState({ liteMode: (e.target as HTMLInputElement).checked }));
 }
 
 // Update top-time element with India time every second

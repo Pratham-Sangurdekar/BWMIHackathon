@@ -419,6 +419,36 @@ function accountView() {
   document.querySelector("#start-kyc")?.addEventListener("click", () => { (document.querySelector("#aadhaar-status") as HTMLElement).textContent = "Verification in progress"; setTimeout(() => { (document.querySelector("#aadhaar-status") as HTMLElement).textContent = "Verified"; }, 1200); });
 }
 
+function trainsView() {
+  layout(`<section class="panel"><h1>Trains</h1><p>Choose a train feature:</p><div class="actions"><button id="live-train">Live train by number</button><button id="train-status">Train status (route)</button><button id="pnr-enquiry">PNR enquiry</button></div><div id="trains-content"></div></section>`);
+  document.querySelector("#live-train")?.addEventListener("click", () => { route = "/trains/live"; location.hash = route; });
+  document.querySelector("#train-status")?.addEventListener("click", () => { route = "/trains/status"; location.hash = route; });
+  document.querySelector("#pnr-enquiry")?.addEventListener("click", () => { route = "/pnr"; location.hash = route; });
+}
+
+function liveTrainView() {
+  layout(`<section class="panel narrow"><h1>Live Train</h1><form id="live-form" class="form"><label>Train number<input name="number" /></label><button type="submit">Lookup live position</button></form><div id="live-result"></div></section>`);
+  document.querySelector<HTMLFormElement>("#live-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const num = String(new FormData(e.target as HTMLFormElement).get("number") || "");
+    const out = document.querySelector<HTMLDivElement>('#live-result')!;
+    if (!num) { out.innerHTML = `<p class="error">Enter a train number.</p>`; return; }
+    // fake live position
+    out.innerHTML = `<p>Train ${num} currently at ${Math.random() > 0.5 ? 'Mumbai Central' : 'Vadodara'} • expected at ${['10:12','13:34','17:05'][Math.floor(Math.random()*3)]}</p>`;
+  });
+}
+
+function trainStatusView() {
+  layout(`<section class="panel narrow"><h1>Train Status</h1><form id="status-form" class="form"><label>Train number<input name="number" /></label><button type="submit">Show route</button></form><div id="status-result"></div></section>`);
+  document.querySelector<HTMLFormElement>('#status-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const num = String(new FormData(e.target as HTMLFormElement).get('number') || '');
+    const out = document.querySelector('#status-result')! as HTMLElement;
+    if (!num) { out.innerHTML = '<p class="error">Enter a train number.</p>'; return; }
+    out.innerHTML = `<p>Train ${num} route: NDLS → BPL → MUMBAI CST → CSTM. Status: On time. Last updated ${new Date().toLocaleTimeString()}.</p>`;
+  });
+}
+
 function render() {
   if (!getState().language) return languageGate();
   requireAuth();
@@ -429,6 +459,9 @@ function render() {
   else if (route === "/pnr") pnrView();
   else if (route === "/help") helpView();
   else if (route === "/account") accountView();
+  else if (route === "/trains") trainsView();
+  else if (route === "/trains/live") liveTrainView();
+  else if (route === "/trains/status") trainStatusView();
   else bookView();
   wireGlobal();
 }

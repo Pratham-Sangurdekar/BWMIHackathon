@@ -362,26 +362,63 @@ function resultCard(result: JourneyResult) {
 
 function detailView(result: JourneyResult) {
   const legs = result.legs.map((leg, index) => `<li><strong>${leg.train.number} ${leg.train.name}</strong><span>${leg.from.name} (${leg.from.code}) ${leg.train.depart} → ${leg.to.name} (${leg.to.code}) ${leg.train.arrive}</span><span>${mins(leg.train.durationMins)} • runs ${leg.train.days.map((d) => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ")} • ${leg.train.classes.map((c) => `${c.classCode} ₹${c.fare} ${c.availability}`).join(" | ")}</span>${index === 0 && result.transferMins ? `<em>Transfer wait: ${mins(result.transferMins)}</em>` : ""}</li>`).join("");
-  return `<section class="panel journey-detail"><button id="back-results">Back to results</button><h2>${result.kind === "direct" ? "Direct journey details" : "Connecting journey details"}</h2><ul class="legs detail">${legs}</ul><p><strong>Total:</strong> ${mins(result.durationMins)} • ${result.availability} • ₹${result.totalFare} • ${lastQuery ? quotaLabel(lastQuery.quota) : ""}</p><button data-book="${result.id}">Continue to passenger details</button></section>`;
+  return `<section class="panel journey-detail"><button id="back-results">Back to results</button><h2>${result.kind === "direct" ? "Direct journey details" : "Connecting journey details"}</h2><ul class="legs detail">${legs}</ul><p><strong>Total:</strong> ${mins(result.durationMins)} • ${result.availability} • ₹${result.totalFare} • ${lastQuery ? quotaLabel(lastQuery.quota) : ""}</p><button data-book="${result.id}" class="pay-now">Pay now</button></section>`;
 }
 
 function statusPanel() {
   if (!activeAttempt) return "";
   const meaning = bookingMeaning(activeAttempt.state);
   const leg = activeAttempt.journey.legs[0];
-  return `<section class="status ${meaning.citizenState.toLowerCase().replace(/\s+/g, "-")}" aria-live="polite"><h2>${meaning.citizenState}</h2>${duplicateNotice ? `<div class="warning"><strong>You already have a booking attempt for this journey.</strong><br/>${duplicateNotice}</div>` : ""}<p><strong>${meaning.next}</strong></p><div class="four-part"><p>${meaning.money}</p><p>${meaning.ticket}</p></div>${activeAttempt.state === "BOOKING_UNKNOWN" ? `<div class="warning">DO NOT PAY AGAIN</div>` : ""}<div class="actions">${(activeAttempt.state === "BOOKING_UNKNOWN" || activeAttempt.state === "REFUND_PENDING") ? `<button id="check-status">Check booking status</button>` : ""}${activeAttempt.state === "BOOKED" ? `<button id="view-ticket">View ticket</button><button id="download-ticket">Download ticket</button><button id="add-trip">Add to trips</button><button id="pnr-status">Check PNR status</button>` : ""}${activeAttempt.retryAllowed ? `<button id="safe-retry">Safe to try another booking</button>` : ""}</div><details open><summary>Booking timeline</summary>${activeAttempt.timeline.map((item) => `<p><time>${item.time}</time> ${item.label}</p>`).join("")}</details><p class="muted">Attempt ${activeAttempt.id} • ${leg.train.name} • ${activeAttempt.query.date}</p></section>`;
+  // Build timeline items with state-specific classes for animation
+  const timelineHtml = activeAttempt.timeline.map((item, i) => {
+    const label = item.label || "";
+    const cls = label.toLowerCase().includes("payment") ? "tl-payment" : label.toLowerCase().includes("failed") ? "tl-failed" : label.toLowerCase().includes("refund") ? "tl-refund" : label.toLowerCase().includes("received") || label.toLowerCase().includes("confirmed") ? "tl-success" : "tl-processing";
+    return `<div class="timeline-item ${cls}" data-index="${i}"><div class="tl-icon ${cls}"></div><div class="tl-time">${item.time}</div><div class="tl-text">${item.label}</div></div>`;
+  }).join("");
+  return `<section class="status ${meaning.citizenState.toLowerCase().replace(/\s+/g, "-")}" aria-live="polite"><h2>${meaning.citizenState}</h2>${duplicateNotice ? `<div class="warning"><strong>You already have a booking attempt for this journey.</strong><br/>${duplicateNotice}</div>` : ""}<p><strong>${meaning.next}</strong></p><div class="four-part"><p>${meaning.money}</p><p>${meaning.ticket}</p></div>${activeAttempt.state === "BOOKING_UNKNOWN" ? `<div class="warning">DO NOT PAY AGAIN</div>` : ""}<div class="actions">${(activeAttempt.state === "BOOKING_UNKNOWN" || activeAttempt.state === "REFUND_PENDING") ? `<button id="check-status">Check booking status</button>` : ""}${activeAttempt.state === "BOOKED" ? `<button id="view-ticket">View ticket</button><button id="download-ticket">Download ticket</button><button id="add-trip">Add to trips</button><button id="pnr-status">Check PNR status</button>` : ""}${activeAttempt.retryAllowed ? `<button id="safe-retry">Safe to try another booking</button>` : ""}</div><div class="timeline" id="booking-timeline">${timelineHtml}</div><p class="muted">Attempt ${activeAttempt.id} • ${leg.train.name} • ${activeAttempt.query.date}</p></section>`;
+}
+
+// Animate timeline items quickly and sequentially
+function animateBookingTimeline() {
+  const container = document.getElementById("booking-timeline");
+  if (!container) return;
+  const items = Array.from(container.querySelectorAll<HTMLDivElement>(".timeline-item"));
+  // reveal items in quick succession; track if already visible
+  let i = 0;
+  const revealNext = () => {
+    if (i >= items.length) return;
+    const el = items[i];
+    // use rAF to ensure CSS transition triggers
+    requestAnimationFrame(() => el.classList.add("visible"));
+    i += 1;
+    setTimeout(revealNext, 120);
+  };
+  // Clear any existing visible class then start
+  items.forEach((it) => it.classList.remove("visible"));
+  if (items.length) setTimeout(revealNext, 60);
 }
 
 function wireGlobal() {
   document.querySelectorAll<HTMLButtonElement>("[data-detail]").forEach((button) => button.addEventListener("click", () => { detailJourney = results.find((item) => item.id === button.dataset.detail); render(); }));
   document.querySelector("#back-results")?.addEventListener("click", () => { detailJourney = undefined; render(); });
-  document.querySelectorAll<HTMLButtonElement>("[data-book]").forEach((button) => button.addEventListener("click", async () => {
+  document.querySelectorAll<HTMLButtonElement>('[data-book]').forEach((button) => button.addEventListener('click', () => {
     const journey = results.find((item) => item.id === button.dataset.book);
     if (!journey || !lastQuery) return;
     const duplicate = duplicateAttempt(journey, lastQuery);
     if (duplicate) { activeAttempt = duplicate; duplicateNotice = `Payment status: ${bookingMeaning(duplicate.state).money} Booking status: ${duplicate.state}. Attempt ID: ${duplicate.id}. We recommend checking the previous booking before paying again.`; detailJourney = undefined; render(); return; }
     duplicateNotice = ""; loading = "Sending your booking request... Confirming your payment..."; render();
-    activeAttempt = await startBooking(journey, lastQuery); loading = ""; detailJourney = undefined; render();
+    // Start booking but don't await; startBooking synchronously saves an initial attempt before the first await
+    const bookingPromise = startBooking(journey, lastQuery);
+    // attempt is saved immediately inside startBooking; fetch the saved attempt from state to show timeline while processing
+    const maybe = getState().attempts.find((a) => a.journey.id === journey.id && a.query.date === lastQuery!.date && a.query.from === lastQuery!.from && a.query.to === lastQuery!.to);
+    if (maybe) {
+      activeAttempt = maybe;
+      detailJourney = undefined;
+      render();
+    }
+    bookingPromise.then((attempt) => {
+      activeAttempt = attempt; loading = ""; detailJourney = undefined; render();
+    }).catch((err) => { loading = ""; message = err instanceof Error ? err.message : String(err); render(); });
   }));
   document.querySelector("#check-status")?.addEventListener("click", async () => { if (!activeAttempt) return; loading = "Payment received. Checking whether the railway reservation was created..."; render(); activeAttempt = await checkBookingStatus(activeAttempt.id); loading = ""; render(); });
   document.querySelector("#view-ticket")?.addEventListener("click", () => { route = "/pnr"; location.hash = route; });
@@ -531,6 +568,11 @@ function trainStatusView() {
 function render() {
   if (!getState().language) return languageGate();
   requireAuth();
+  // If we have an activeAttempt reference, refresh it from persisted state so intermediate timeline updates are reflected
+  if (activeAttempt) {
+    const fresh = getState().attempts.find((a) => a.id === activeAttempt!.id);
+    if (fresh) activeAttempt = fresh;
+  }
   // Toggle sign-in background class based on route
   if (route === "/account") document.body.classList.add("signin-bg");
   else document.body.classList.remove("signin-bg");
@@ -557,6 +599,8 @@ function render() {
   else if (route === "/trains/apps") irctcAppsView();
   else bookView();
   wireGlobal();
+  // Trigger the quick timeline animation if a booking timeline is present
+  try { animateBookingTimeline(); } catch (e) { /* ignore animation errors */ }
 }
 
 // start India time when app loads

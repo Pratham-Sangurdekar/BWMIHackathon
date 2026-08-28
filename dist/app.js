@@ -57,7 +57,26 @@ function layout(content) {
       <a class="brand" href="#/book"><img class="brand-logo" src="/image.png" alt="RailVishwas logo"/><span><strong>RailVishwas</strong><small>Know your booking. Know what to do next.</small></span></a>
       <nav aria-label="Primary">
         <a class="${route === "/book" ? "active" : ""}" href="#/book">${label("book")}</a>
-        <a class="${route === "/trains" || route.startsWith("/trains") ? "active" : ""}" href="#/trains">TRAINS</a>
+        <div class="dropdown-parent ${route === "/trains" || route.startsWith("/trains") ? "active" : ""}">
+          <a href="#/trains">TRAINS</a>
+          <div class="dropdown" role="menu">
+            <a role="menuitem" href="#/trains/book">Book Ticket</a>
+            <a role="menuitem" href="#/trains/foreign">Foreign Tourist Booking</a>
+            <a role="menuitem" href="#/trains/connecting">Connecting Journey Booking</a>
+            <a role="menuitem" href="#/trains/irctc">IRCTC TRAINS</a>
+            <a role="menuitem" href="#/trains/cancel">Cancel E-Ticket</a>
+            <a role="menuitem" href="#/pnr">PNR Enquiry</a>
+            <a role="menuitem" href="#/trains/schedule">Train Schedule</a>
+            <a role="menuitem" href="#/trains/track">Track Your Train</a>
+            <a role="menuitem" href="#/trains/ftr">FTR Coach/Train Booking</a>
+            <a role="menuitem" href="#/trains/luggage">Luggage Booking</a>
+            <a role="menuitem" href="#/trains/pets">Dogs/Cats Booking</a>
+            <a role="menuitem" href="#/trains/link-aadhaar">Link Your Aadhaar</a>
+            <a role="menuitem" href="#/trains/counter-cancel">Counter Ticket Cancellation</a>
+            <a role="menuitem" href="#/trains/counter-change">Counter Ticket Boarding Point Change</a>
+            <a role="menuitem" href="#/trains/apps">IRCTC Official Mobile Apps</a>
+          </div>
+        </div>
         <a class="${route === "/trips" ? "active" : ""}" href="#/trips">${label("trips")}</a>
         <a class="${route === "/pnr" ? "active" : ""}" href="#/pnr">${label("pnr")}</a>
         <a class="${route === "/help" ? "active" : ""}" href="#/help">${label("help")}</a>
@@ -70,6 +89,45 @@ function layout(content) {
     <main id="main" tabindex="-1">${content}</main>
     <footer>Prototype — railway, payment and refund data are simulated. Do not enter real payment, OTP, Aadhaar, or IRCTC credentials.</footer>`;
     document.querySelector("#language-control")?.addEventListener("change", (e) => setState({ language: e.target.value }));
+}
+// Initialize dropdown toggle behavior once per page lifecycle to avoid duplicate listeners
+function initTrainsDropdown() {
+    const parent = document.querySelector(".dropdown-parent");
+    if (!parent)
+        return;
+    if (parent.dataset.dropdownInit)
+        return;
+    parent.dataset.dropdownInit = "1";
+    const toggle = parent.querySelector(":scope > a");
+    if (toggle) {
+        toggle.addEventListener("click", (e) => {
+            e.preventDefault();
+            parent.classList.toggle("open");
+            const expanded = parent.classList.contains("open");
+            toggle.setAttribute("aria-expanded", String(expanded));
+        });
+        // ensure ARIA attribute exists
+        toggle.setAttribute("aria-haspopup", "true");
+        toggle.setAttribute("aria-expanded", "false");
+    }
+    // Close when clicking outside
+    document.addEventListener("click", (e) => {
+        if (!parent.classList.contains("open"))
+            return;
+        if (parent.contains(e.target))
+            return;
+        parent.classList.remove("open");
+        if (toggle)
+            toggle.setAttribute("aria-expanded", "false");
+    });
+    // Close on Escape
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            parent.classList.remove("open");
+            if (toggle)
+                toggle.setAttribute("aria-expanded", "false");
+        }
+    });
 }
 // Update top-time element with India time every second
 function startIndiaTime() {
@@ -147,7 +205,7 @@ function bookView() {
         <label>Mock disability ID<input name="disabilityId" value="${lastQuery?.disabilityId || ""}" /></label>
         <label class="check"><input name="railPass" type="checkbox" ${lastQuery?.railPass ? "checked" : ""}/> Railway pass concession</label>
         <label>Mock pass number<input name="passNumber" value="${lastQuery?.passNumber || ""}" /></label>
-        <label>DEMO SCENARIO<select name="scenario">${option("normal", "Normal successful booking", lastQuery?.scenario === "normal" || !lastQuery)}${option("unknownBooked", "Payment success → unknown → booked", lastQuery?.scenario === "unknownBooked")}${option("unknownNotBooked", "Payment success → unknown → refund", lastQuery?.scenario === "unknownNotBooked")}${option("paymentFailed", "Payment failed → safe retry", lastQuery?.scenario === "paymentFailed")}</select></label>
+        <label class="demo-scenario">DEMO SCENARIO<select name="scenario">${option("normal", "Normal successful booking", lastQuery?.scenario === "normal" || !lastQuery)}${option("unknownBooked", "Payment success → unknown → booked", lastQuery?.scenario === "unknownBooked")}${option("unknownNotBooked", "Payment success → unknown → refund", lastQuery?.scenario === "unknownNotBooked")}${option("paymentFailed", "Payment failed → safe retry", lastQuery?.scenario === "paymentFailed")}</select></label>
         <p id="search-error" class="error" role="alert">${message && !results.length ? message : ""}</p>
         <button type="submit">Search trains</button>
       </form>
@@ -368,19 +426,47 @@ function resultCard(result) {
 }
 function detailView(result) {
     const legs = result.legs.map((leg, index) => `<li><strong>${leg.train.number} ${leg.train.name}</strong><span>${leg.from.name} (${leg.from.code}) ${leg.train.depart} → ${leg.to.name} (${leg.to.code}) ${leg.train.arrive}</span><span>${mins(leg.train.durationMins)} • runs ${leg.train.days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ")} • ${leg.train.classes.map((c) => `${c.classCode} ₹${c.fare} ${c.availability}`).join(" | ")}</span>${index === 0 && result.transferMins ? `<em>Transfer wait: ${mins(result.transferMins)}</em>` : ""}</li>`).join("");
-    return `<section class="panel journey-detail"><button id="back-results">Back to results</button><h2>${result.kind === "direct" ? "Direct journey details" : "Connecting journey details"}</h2><ul class="legs detail">${legs}</ul><p><strong>Total:</strong> ${mins(result.durationMins)} • ${result.availability} • ₹${result.totalFare} • ${lastQuery ? quotaLabel(lastQuery.quota) : ""}</p><button data-book="${result.id}">Continue to passenger details</button></section>`;
+    return `<section class="panel journey-detail"><button id="back-results">Back to results</button><h2>${result.kind === "direct" ? "Direct journey details" : "Connecting journey details"}</h2><ul class="legs detail">${legs}</ul><p><strong>Total:</strong> ${mins(result.durationMins)} • ${result.availability} • ₹${result.totalFare} • ${lastQuery ? quotaLabel(lastQuery.quota) : ""}</p><button data-book="${result.id}" class="pay-now">Pay now</button></section>`;
 }
 function statusPanel() {
     if (!activeAttempt)
         return "";
     const meaning = bookingMeaning(activeAttempt.state);
     const leg = activeAttempt.journey.legs[0];
-    return `<section class="status ${meaning.citizenState.toLowerCase().replace(/\s+/g, "-")}" aria-live="polite"><h2>${meaning.citizenState}</h2>${duplicateNotice ? `<div class="warning"><strong>You already have a booking attempt for this journey.</strong><br/>${duplicateNotice}</div>` : ""}<p><strong>${meaning.next}</strong></p><div class="four-part"><p>${meaning.money}</p><p>${meaning.ticket}</p></div>${activeAttempt.state === "BOOKING_UNKNOWN" ? `<div class="warning">DO NOT PAY AGAIN</div>` : ""}<div class="actions">${(activeAttempt.state === "BOOKING_UNKNOWN" || activeAttempt.state === "REFUND_PENDING") ? `<button id="check-status">Check booking status</button>` : ""}${activeAttempt.state === "BOOKED" ? `<button id="view-ticket">View ticket</button><button id="download-ticket">Download ticket</button><button id="add-trip">Add to trips</button><button id="pnr-status">Check PNR status</button>` : ""}${activeAttempt.retryAllowed ? `<button id="safe-retry">Safe to try another booking</button>` : ""}</div><details open><summary>Booking timeline</summary>${activeAttempt.timeline.map((item) => `<p><time>${item.time}</time> ${item.label}</p>`).join("")}</details><p class="muted">Attempt ${activeAttempt.id} • ${leg.train.name} • ${activeAttempt.query.date}</p></section>`;
+    // Build timeline items with state-specific classes for animation
+    const timelineHtml = activeAttempt.timeline.map((item, i) => {
+        const label = item.label || "";
+        const cls = label.toLowerCase().includes("payment") ? "tl-payment" : label.toLowerCase().includes("failed") ? "tl-failed" : label.toLowerCase().includes("refund") ? "tl-refund" : label.toLowerCase().includes("received") || label.toLowerCase().includes("confirmed") ? "tl-success" : "tl-processing";
+        return `<div class="timeline-item ${cls}" data-index="${i}"><div class="tl-icon ${cls}"></div><div class="tl-time">${item.time}</div><div class="tl-text">${item.label}</div></div>`;
+    }).join("");
+    return `<section class="status ${meaning.citizenState.toLowerCase().replace(/\s+/g, "-")}" aria-live="polite"><h2>${meaning.citizenState}</h2>${duplicateNotice ? `<div class="warning"><strong>You already have a booking attempt for this journey.</strong><br/>${duplicateNotice}</div>` : ""}<p><strong>${meaning.next}</strong></p><div class="four-part"><p>${meaning.money}</p><p>${meaning.ticket}</p></div>${activeAttempt.state === "BOOKING_UNKNOWN" ? `<div class="warning">DO NOT PAY AGAIN</div>` : ""}<div class="actions">${(activeAttempt.state === "BOOKING_UNKNOWN" || activeAttempt.state === "REFUND_PENDING") ? `<button id="check-status">Check booking status</button>` : ""}${activeAttempt.state === "BOOKED" ? `<button id="view-ticket">View ticket</button><button id="download-ticket">Download ticket</button><button id="add-trip">Add to trips</button><button id="pnr-status">Check PNR status</button>` : ""}${activeAttempt.retryAllowed ? `<button id="safe-retry">Safe to try another booking</button>` : ""}</div><div class="timeline" id="booking-timeline">${timelineHtml}</div><p class="muted">Attempt ${activeAttempt.id} • ${leg.train.name} • ${activeAttempt.query.date}</p></section>`;
+}
+// Animate timeline items quickly and sequentially
+function animateBookingTimeline() {
+    const container = document.getElementById("booking-timeline");
+    if (!container)
+        return;
+    const items = Array.from(container.querySelectorAll(".timeline-item"));
+    // reveal items in quick succession; track if already visible
+    let i = 0;
+    const revealNext = () => {
+        if (i >= items.length)
+            return;
+        const el = items[i];
+        // use rAF to ensure CSS transition triggers
+        requestAnimationFrame(() => el.classList.add("visible"));
+        i += 1;
+        setTimeout(revealNext, 120);
+    };
+    // Clear any existing visible class then start
+    items.forEach((it) => it.classList.remove("visible"));
+    if (items.length)
+        setTimeout(revealNext, 60);
 }
 function wireGlobal() {
     document.querySelectorAll("[data-detail]").forEach((button) => button.addEventListener("click", () => { detailJourney = results.find((item) => item.id === button.dataset.detail); render(); }));
     document.querySelector("#back-results")?.addEventListener("click", () => { detailJourney = undefined; render(); });
-    document.querySelectorAll("[data-book]").forEach((button) => button.addEventListener("click", async () => {
+    document.querySelectorAll('[data-book]').forEach((button) => button.addEventListener('click', () => {
         const journey = results.find((item) => item.id === button.dataset.book);
         if (!journey || !lastQuery)
             return;
@@ -395,10 +481,21 @@ function wireGlobal() {
         duplicateNotice = "";
         loading = "Sending your booking request... Confirming your payment...";
         render();
-        activeAttempt = await startBooking(journey, lastQuery);
-        loading = "";
-        detailJourney = undefined;
-        render();
+        // Start booking but don't await; startBooking synchronously saves an initial attempt before the first await
+        const bookingPromise = startBooking(journey, lastQuery);
+        // attempt is saved immediately inside startBooking; fetch the saved attempt from state to show timeline while processing
+        const maybe = getState().attempts.find((a) => a.journey.id === journey.id && a.query.date === lastQuery.date && a.query.from === lastQuery.from && a.query.to === lastQuery.to);
+        if (maybe) {
+            activeAttempt = maybe;
+            detailJourney = undefined;
+            render();
+        }
+        bookingPromise.then((attempt) => {
+            activeAttempt = attempt;
+            loading = "";
+            detailJourney = undefined;
+            render();
+        }).catch((err) => { loading = ""; message = err instanceof Error ? err.message : String(err); render(); });
     }));
     document.querySelector("#check-status")?.addEventListener("click", async () => { if (!activeAttempt)
         return; loading = "Payment received. Checking whether the railway reservation was created..."; render(); activeAttempt = await checkBookingStatus(activeAttempt.id); loading = ""; render(); });
@@ -426,6 +523,8 @@ function wireGlobal() {
     document.querySelector("#filter-duration")?.addEventListener("input", (e) => { filters = { ...filters, maxDuration: Number(e.target.value) * 60 }; page = 1; render(); });
     document.querySelector("#filter-fare")?.addEventListener("input", (e) => { filters = { ...filters, maxFare: Number(e.target.value) }; page = 1; render(); });
     document.querySelector("#filter-via")?.addEventListener("input", (e) => { filters = { ...filters, via: e.target.value }; page = 1; render(); });
+    // initialize trains dropdown behaviour (one-time)
+    initTrainsDropdown();
 }
 function shiftAndSearch(days) {
     if (!lastQuery)
@@ -493,6 +592,28 @@ function trainsView() {
     document.querySelector("#train-status")?.addEventListener("click", () => { route = "/trains/status"; location.hash = route; });
     document.querySelector("#pnr-enquiry")?.addEventListener("click", () => { route = "/pnr"; location.hash = route; });
 }
+function bookTicketView() {
+    layout(`<section class="panel"><h1>Book Ticket</h1><p>This opens the standard booking flow.</p><a href="#/book">Open booking</a></section>`);
+}
+function foreignTouristView() {
+    layout(`<section class="panel"><h1>Foreign Tourist Booking</h1><p>Special booking path for foreign tourists (prototype).</p></section>`);
+}
+function connectingJourneyView() {
+    layout(`<section class="panel"><h1>Connecting Journey Booking</h1><p>Search connecting journeys and book links.</p></section>`);
+}
+function irctcTrainsView() {
+    layout(`<section class="panel"><h1>IRCTC Trains</h1><p>IRCTC trains and special info.</p></section>`);
+}
+function cancelTicketView() { layout(`<section class="panel"><h1>Cancel E-Ticket</h1><p>Enter PNR to cancel an e-ticket (prototype).</p></section>`); }
+function trainScheduleView() { layout(`<section class="panel"><h1>Train Schedule</h1><p>Search train schedule by number or route.</p></section>`); }
+function trackTrainView() { layout(`<section class="panel"><h1>Track Your Train</h1><p>Enter train number to view live movement.</p></section>`); }
+function ftrBookingView() { layout(`<section class="panel"><h1>FTR Coach/Train Booking</h1><p>Prototype for FTR bookings.</p></section>`); }
+function luggageBookingView() { layout(`<section class="panel"><h1>Luggage Booking</h1><p>Book parcel and luggage services.</p></section>`); }
+function petsBookingView() { layout(`<section class="panel"><h1>Dogs/Cats Booking</h1><p>Pet travel booking options.</p></section>`); }
+function linkAadhaarView() { layout(`<section class="panel"><h1>Link Your Aadhaar</h1><p>Link Aadhaar to your profile (simulated).</p></section>`); }
+function counterCancelView() { layout(`<section class="panel"><h1>Counter Ticket Cancellation</h1><p>Counter cancellation info and form.</p></section>`); }
+function counterChangeView() { layout(`<section class="panel"><h1>Counter Ticket Boarding Point Change</h1><p>Change boarding point at counter (prototype).</p></section>`); }
+function irctcAppsView() { layout(`<section class="panel"><h1>IRCTC Official Mobile Apps</h1><p>Links to official apps (prototype).</p></section>`); }
 function liveTrainView() {
     layout(`<section class="panel narrow"><h1>Live Train</h1><form id="live-form" class="form"><label>Train number<input name="number" /></label><button type="submit">Lookup live position</button></form><div id="live-result"></div></section>`);
     document.querySelector("#live-form")?.addEventListener("submit", (e) => {
@@ -524,6 +645,12 @@ function render() {
     if (!getState().language)
         return languageGate();
     requireAuth();
+    // If we have an activeAttempt reference, refresh it from persisted state so intermediate timeline updates are reflected
+    if (activeAttempt) {
+        const fresh = getState().attempts.find((a) => a.id === activeAttempt.id);
+        if (fresh)
+            activeAttempt = fresh;
+    }
     // Toggle sign-in background class based on route
     if (route === "/account")
         document.body.classList.add("signin-bg");
@@ -543,9 +670,42 @@ function render() {
         liveTrainView();
     else if (route === "/trains/status")
         trainStatusView();
+    else if (route === "/trains/book")
+        bookTicketView();
+    else if (route === "/trains/foreign")
+        foreignTouristView();
+    else if (route === "/trains/connecting")
+        connectingJourneyView();
+    else if (route === "/trains/irctc")
+        irctcTrainsView();
+    else if (route === "/trains/cancel")
+        cancelTicketView();
+    else if (route === "/trains/schedule")
+        trainScheduleView();
+    else if (route === "/trains/track")
+        trackTrainView();
+    else if (route === "/trains/ftr")
+        ftrBookingView();
+    else if (route === "/trains/luggage")
+        luggageBookingView();
+    else if (route === "/trains/pets")
+        petsBookingView();
+    else if (route === "/trains/link-aadhaar")
+        linkAadhaarView();
+    else if (route === "/trains/counter-cancel")
+        counterCancelView();
+    else if (route === "/trains/counter-change")
+        counterChangeView();
+    else if (route === "/trains/apps")
+        irctcAppsView();
     else
         bookView();
     wireGlobal();
+    // Trigger the quick timeline animation if a booking timeline is present
+    try {
+        animateBookingTimeline();
+    }
+    catch (e) { /* ignore animation errors */ }
 }
 // start India time when app loads
 startIndiaTime();
